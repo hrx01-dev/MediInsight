@@ -361,7 +361,7 @@ fun ThemeOption(
                 Box(
                     Modifier
                         .size(24.dp)
-                        .background(Color(0xFF10B981), CircleShape),
+                        .background(Color(0xFF10B954), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
