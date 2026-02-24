@@ -87,7 +87,20 @@ dependencies {
     // AndroidX Security (required by SDK)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-
+    // OpenCV for image processing
+    implementation("org.opencv:opencv:4.9.0")
+    
+    // Google ML Kit Text Recognition (OCR)
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+    
+    // CameraX for camera integration
+    implementation("androidx.camera:camera-core:1.3.1")
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
+    
+    // Coil for image loading in Compose
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
 
 
