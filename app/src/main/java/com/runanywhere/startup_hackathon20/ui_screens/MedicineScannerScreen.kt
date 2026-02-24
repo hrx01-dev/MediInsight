@@ -36,6 +36,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
 import com.runanywhere.startup_hackathon20.ocr.TextRecognitionAnalyzer
 import com.runanywhere.startup_hackathon20.viewmodel.ScannerViewModel
+import com.runanywhere.startup_hackathon20.viewmodel.SharedMedicineViewModel
 import java.util.concurrent.Executors
 
 /**
@@ -47,15 +48,16 @@ import java.util.concurrent.Executors
 fun MedicineScannerScreen(
     onBack: () -> Unit,
     onUseCapturedText: (String) -> Unit = {},
-    viewModel: ScannerViewModel = viewModel()
+    scannerViewModel: ScannerViewModel = viewModel(),
+    sharedViewModel: SharedMedicineViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
 
-    val detectedText by viewModel.detectedText.collectAsState()
-    val isScanning by viewModel.isScanning.collectAsState()
-    val error by viewModel.error.collectAsState()
+    val detectedText by scannerViewModel.detectedText.collectAsState()
+    val isScanning by scannerViewModel.isScanning.collectAsState()
+    val error by scannerViewModel.error.collectAsState()
 
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var analyzer by remember { mutableStateOf<TextRecognitionAnalyzer?>(null) }
@@ -108,10 +110,10 @@ fun MedicineScannerScreen(
                             cameraProvider = cameraProvider,
                             isScanning = isScanning,
                             onTextDetected = { text ->
-                                viewModel.updateDetectedText(text)
+                                scannerViewModel.updateDetectedText(text)
                             },
                             onError = { exception ->
-                                viewModel.setError(exception.message ?: "Unknown error")
+                                scannerViewModel.setError(exception.message ?: "Unknown error")
                             },
                             onAnalyzerCreated = { newAnalyzer ->
                                 analyzer = newAnalyzer
@@ -130,9 +132,11 @@ fun MedicineScannerScreen(
                         detectedText = detectedText,
                         isScanning = isScanning,
                         error = error,
-                        onToggleScanning = { viewModel.toggleScanning() },
-                        onClearHistory = { viewModel.clearHistory() },
+                        onToggleScanning = { scannerViewModel.toggleScanning() },
+                        onClearHistory = { scannerViewModel.clearHistory() },
                         onUseCapturedText = {
+                            // Set scanned text in shared ViewModel for AddMedicine screen
+                            sharedViewModel.setScannedText(detectedText)
                             onUseCapturedText(detectedText)
                             onBack()
                         },

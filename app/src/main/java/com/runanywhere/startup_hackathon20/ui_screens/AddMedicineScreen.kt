@@ -18,13 +18,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.startup_hackathon20.ui.theme.Startup_hackathon20Theme
 import com.runanywhere.startup_hackathon20.viewmodel.MedicineViewModel
+import com.runanywhere.startup_hackathon20.viewmodel.SharedMedicineViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
 fun AddMedicineScreen(
     onBack: () -> Unit,
     onMedicineAdded: () -> Unit = {},
-    viewModel: MedicineViewModel? = viewModel()
+    viewModel: MedicineViewModel? = viewModel(),
+    sharedViewModel: SharedMedicineViewModel = viewModel()
 ) {
     var name by remember { mutableStateOf("") }
     var dosage by remember { mutableStateOf("") }
@@ -34,9 +36,31 @@ fun AddMedicineScreen(
     var quantity by remember { mutableStateOf("") }
     var instructions by remember { mutableStateOf("") }
     var showSuccess by remember { mutableStateOf(false) }
+    var showAIParsingDialog by remember { mutableStateOf(false) }
 
     val isLoading by (viewModel?.isLoading ?: MutableStateFlow(false)).collectAsState()
     val error by (viewModel?.error ?: MutableStateFlow<String?>(null)).collectAsState()
+    
+    // Shared ViewModel states for scanned text
+    val parsedMedicine by sharedViewModel.parsedMedicine.collectAsState()
+    val isParsing by sharedViewModel.isParsing.collectAsState()
+    val parseError by sharedViewModel.parseError.collectAsState()
+    
+    // Auto-fill form when parsed medicine data is available
+    LaunchedEffect(parsedMedicine) {
+        parsedMedicine?.let { parsed ->
+            name = parsed.name
+            dosage = parsed.dosage
+            frequency = parsed.frequency
+            time = parsed.time
+            duration = parsed.duration
+            quantity = parsed.quantity
+            instructions = parsed.instructions
+            showAIParsingDialog = true
+            // Clear after using
+            // sharedViewModel.clearScannedData() // Don't clear immediately, let user see it
+        }
+    }
 
     // Success dialog
     if (showSuccess) {
@@ -95,6 +119,63 @@ fun AddMedicineScreen(
             }
         )
     }
+    
+    // AI Parsing Success Dialog
+    if (showAIParsingDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showAIParsingDialog = false
+                sharedViewModel.clearScannedData()
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = Color(0xFF3B82F6),
+                    modifier = Modifier.size(64.dp)
+                )
+            },
+            title = {
+                Text(
+                    "AI Parsed Medicine Info",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Column {
+                    Text("The AI has extracted medicine information from the scanned text:")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (isParsing) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Text("Analyzing text with AI...")
+                    } else {
+                        Text("✓ Form fields have been auto-filled", fontWeight = FontWeight.Medium)
+                        Text("Please review and edit if needed.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    parseError?.let { err ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Note: $err",
+                            color = Color(0xFFEF4444),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showAIParsingDialog = false
+                        sharedViewModel.clearScannedData()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                ) {
+                    Text("Got It!")
+                }
+            }
+        )
+    }
 
     Column(
         Modifier
@@ -145,6 +226,71 @@ fun AddMedicineScreen(
                         text = errorMessage,
                         color = Color(0xFFDC2626)
                     )
+                }
+            }
+        }
+        
+        // AI Parsing Status Banner
+        if (isParsing) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFDEEDFF))
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color(0xFF3B82F6)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "AI is analyzing scanned text...",
+                        color = Color(0xFF3B82F6),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        } else if (parsedMedicine != null) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFD1FAE5))
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = Color(0xFF10B981),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "AI Auto-filled from Scan",
+                            color = Color(0xFF10B981),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Review and edit fields as needed",
+                            color = Color(0xFF059669),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    IconButton(onClick = { sharedViewModel.clearScannedData() }) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Dismiss",
+                            tint = Color(0xFF10B981)
+                        )
+                    }
                 }
             }
         }
