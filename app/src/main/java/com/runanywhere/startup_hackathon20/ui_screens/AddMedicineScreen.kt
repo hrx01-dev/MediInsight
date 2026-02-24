@@ -38,8 +38,12 @@ fun AddMedicineScreen(
     var showSuccess by remember { mutableStateOf(false) }
     var showAIParsingDialog by remember { mutableStateOf(false) }
 
-    val isLoading by (viewModel?.isLoading ?: MutableStateFlow(false)).collectAsState()
-    val error by (viewModel?.error ?: MutableStateFlow<String?>(null)).collectAsState()
+    // Create fallback flows once and reuse them
+    val defaultLoadingFlow = remember { MutableStateFlow(false) }
+    val defaultErrorFlow = remember { MutableStateFlow<String?>(null) }
+    
+    val isLoading by (viewModel?.isLoading ?: defaultLoadingFlow).collectAsState()
+    val error by (viewModel?.error ?: defaultErrorFlow).collectAsState()
     
     // Shared ViewModel states for scanned text
     val parsedMedicine by sharedViewModel.parsedMedicine.collectAsState()
