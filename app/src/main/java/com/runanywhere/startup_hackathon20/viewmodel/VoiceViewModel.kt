@@ -1,0 +1,586 @@
+package com.runanywhere.startup_hackathon20.viewmodel
+
+import android.app.Application
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.AudioTrack
+import android.media.MediaRecorder
+import android.util.Log
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.listAvailableModels
+import com.runanywhere.sdk.models.ModelInfo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+data class VoiceState(
+    val isRecording: Boolean = false,
+    val isTranscribing: Boolean = false,
+    val isSpeaking: Boolean = false,
+    val isProcessing: Boolean = false,
+    val transcribedText: String = "",
+    val responseText: String = "",
+    val statusMessage: String = "Ready",
+    val audioLevel: Float = 0f,
+    val confidence: Float = 0f
+)
+
+data class ModelLoadingState(
+    val llmModelId: String? = null,
+    val sttModelId: String? = null,
+    val ttsVoiceId: String? = null,
+    val isLLMLoaded: Boolean = false,
+    val isSTTLoaded: Boolean = false,
+    val isTTSLoaded: Boolean = false,
+    val downloadProgress: Float? = null,
+    val statusMessage: String = "Initializing..."
+)
+
+/**
+ * ViewModel for managing voice features:
+ * - Individual components: STT, TTS, VAD
+ * - Complete Voice Agent pipeline: VAD → STT → LLM → TTS
+ */
+class VoiceViewModel(application: Application) : AndroidViewModel(application) {
+    
+    private val TAG = "VoiceViewModel"
+    private val context = application.applicationContext
+
+    // Voice state
+    private val _voiceState = MutableStateFlow(VoiceState())
+    val voiceState: StateFlow<VoiceState> = _voiceState
+
+    // Model loading state
+    private val _modelState = MutableStateFlow(ModelLoadingState())
+    val modelState: StateFlow<ModelLoadingState> = _modelState
+
+    // Available models
+    private val _availableModels = MutableStateFlow<List<ModelInfo>>(emptyList())
+    val availableModels: StateFlow<List<ModelInfo>> = _availableModels
+
+    // Audio recording
+    private var audioRecorder: AudioRecord? = null
+    private val audioBuffer = mutableListOf<Byte>()
+    
+    // Audio playback
+    private var audioTrack: AudioTrack? = null
+
+    // Audio configuration
+    private val sampleRate = 16000
+    private val channelConfig = AudioFormat.CHANNEL_IN_MONO
+    private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+    private val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+
+    init {
+        loadAvailableModels()
+        
+        // Try to auto-load models if available
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(2000)
+            tryAutoLoadModels()
+        }
+    }
+
+    private fun loadAvailableModels() {
+        viewModelScope.launch {
+            try {
+                val models = listAvailableModels()
+                _availableModels.value = models
+                _modelState.value = _modelState.value.copy(
+                    statusMessage = "Ready - Load models to start"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading models: ${e.message}")
+                _modelState.value = _modelState.value.copy(
+                    statusMessage = "Error loading models: ${e.message}"
+                )
+            }
+        }
+    }
+
+    private suspend fun tryAutoLoadModels() {
+        try {
+            val downloadedModels = _availableModels.value.filter { it.isDownloaded }
+            
+            // Try to load an LLM if available
+            val llmModel = downloadedModels.firstOrNull { 
+                it.type.equals("LLM", ignoreCase = true) 
+            }
+            
+            if (llmModel != null) {
+                loadLLMModel(llmModel.id)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Auto-load failed: ${e.message}")
+        }
+    }
+
+    // ==================== Model Management ====================
+
+    fun downloadModel(modelId: String, modelType: String) {
+        viewModelScope.launch {
+            try {
+                _modelState.value = _modelState.value.copy(
+                    statusMessage = "Downloading $modelType model..."
+                )
+                
+                RunAnywhere.downloadModel(modelId).collect { progress ->
+                    _modelState.value = _modelState.value.copy(
+                        downloadProgress = progress,
+                        statusMessage = "Downloading: ${(progress * 100).toInt()}%"
+                    )
+                }
+                
+                _modelState.value = _modelState.value.copy(
+                    downloadProgress = null,
+                    statusMessage = "Download complete! Loading model..."
+                )
+                
+                // Auto-load after download
+                when (modelType.uppercase()) {
+                    "LLM" -> loadLLMModel(modelId)
+                    "STT" -> loadSTTModel(modelId)
+                    "TTS" -> loadTTSVoice(modelId)
+                }
+                
+                loadAvailableModels()
+            } catch (e: Exception) {
+                Log.e(TAG, "Download failed: ${e.message}")
+                _modelState.value = _modelState.value.copy(
+                    downloadProgress = null,
+                    statusMessage = "Download failed: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun loadLLMModel(modelId: String) {
+        viewModelScope.launch {
+            try {
+                _modelState.value = _modelState.value.copy(
+                    statusMessage = "Loading LLM model..."
+                )
+                
+                // Unload existing model
+                try {
+                    RunAnywhere.unloadModel()
+                    kotlinx.coroutines.delay(500)
+                } catch (e: Exception) {
+                    // No model loaded
+                }
+                
+                val success = RunAnywhere.loadModel(modelId)
+                if (success) {
+                    kotlinx.coroutines.delay(1000)
+                    _modelState.value = _modelState.value.copy(
+                        llmModelId = modelId,
+                        isLLMLoaded = true,
+                        statusMessage = "LLM model loaded successfully"
+                    )
+                } else {
+                    _modelState.value = _modelState.value.copy(
+                        statusMessage = "Failed to load LLM model"
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading LLM: ${e.message}")
+                _modelState.value = _modelState.value.copy(
+                    statusMessage = "Error loading LLM: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun loadSTTModel(modelId: String) {
+        viewModelScope.launch {
+            try {
+                _modelState.value = _modelState.value.copy(
+                    statusMessage = "Loading STT model..."
+                )
+                
+                RunAnywhere.loadSTTModel(modelId)
+                kotlinx.coroutines.delay(500)
+                
+                _modelState.value = _modelState.value.copy(
+                    sttModelId = modelId,
+                    isSTTLoaded = true,
+                    statusMessage = "STT model loaded successfully"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading STT: ${e.message}")
+                _modelState.value = _modelState.value.copy(
+                    statusMessage = "Error loading STT: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun loadTTSVoice(voiceId: String) {
+        viewModelScope.launch {
+            try {
+                _modelState.value = _modelState.value.copy(
+                    statusMessage = "Loading TTS voice..."
+                )
+                
+                RunAnywhere.loadTTSVoice(voiceId)
+                kotlinx.coroutines.delay(500)
+                
+                _modelState.value = _modelState.value.copy(
+                    ttsVoiceId = voiceId,
+                    isTTSLoaded = true,
+                    statusMessage = "TTS voice loaded successfully"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading TTS: ${e.message}")
+                _modelState.value = _modelState.value.copy(
+                    statusMessage = "Error loading TTS: ${e.message}"
+                )
+            }
+        }
+    }
+
+    // ==================== Individual Component: STT ====================
+
+    /**
+     * Start recording audio for transcription
+     */
+    fun startRecording() {
+        viewModelScope.launch {
+            try {
+                if (!_modelState.value.isSTTLoaded) {
+                    _voiceState.value = _voiceState.value.copy(
+                        statusMessage = "Please load an STT model first"
+                    )
+                    return@launch
+                }
+
+                audioBuffer.clear()
+                
+                audioRecorder = AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    sampleRate,
+                    channelConfig,
+                    audioFormat,
+                    bufferSize * 2
+                ).apply {
+                    startRecording()
+                }
+
+                _voiceState.value = _voiceState.value.copy(
+                    isRecording = true,
+                    statusMessage = "Recording... Speak now"
+                )
+
+                // Read audio in background
+                viewModelScope.launch(Dispatchers.IO) {
+                    val buffer = ByteArray(bufferSize)
+                    
+                    while (_voiceState.value.isRecording) {
+                        val read = audioRecorder?.read(buffer, 0, buffer.size) ?: 0
+                        if (read > 0) {
+                            audioBuffer.addAll(buffer.take(read))
+                            
+                            // Calculate audio level for visualization
+                            val level = calculateAudioLevel(buffer, read)
+                            withContext(Dispatchers.Main) {
+                                _voiceState.value = _voiceState.value.copy(audioLevel = level)
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting recording: ${e.message}")
+                _voiceState.value = _voiceState.value.copy(
+                    isRecording = false,
+                    statusMessage = "Error starting recording: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Stop recording and transcribe audio
+     */
+    fun stopRecordingAndTranscribe() {
+        viewModelScope.launch {
+            try {
+                _voiceState.value = _voiceState.value.copy(
+                    isRecording = false,
+                    isTranscribing = true,
+                    statusMessage = "Transcribing..."
+                )
+
+                audioRecorder?.stop()
+                audioRecorder?.release()
+                audioRecorder = null
+
+                if (audioBuffer.isEmpty()) {
+                    _voiceState.value = _voiceState.value.copy(
+                        isTranscribing = false,
+                        statusMessage = "No audio recorded"
+                    )
+                    return@launch
+                }
+
+                val audioData = audioBuffer.toByteArray()
+                val transcription = RunAnywhere.transcribe(audioData)
+                
+                _voiceState.value = _voiceState.value.copy(
+                    isTranscribing = false,
+                    transcribedText = transcription,
+                    statusMessage = "Transcription complete",
+                    confidence = 0.95f // Placeholder
+                )
+
+                audioBuffer.clear()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error transcribing: ${e.message}")
+                _voiceState.value = _voiceState.value.copy(
+                    isTranscribing = false,
+                    statusMessage = "Error transcribing: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Transcribe audio from ByteArray directly
+     */
+    suspend fun transcribeAudio(audioData: ByteArray): String {
+        return try {
+            if (!_modelState.value.isSTTLoaded) {
+                throw IllegalStateException("STT model not loaded")
+            }
+            RunAnywhere.transcribe(audioData)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in transcribeAudio: ${e.message}")
+            throw e
+        }
+    }
+
+    // ==================== Individual Component: TTS ====================
+
+    /**
+     * Synthesize text to speech and play it
+     */
+    fun speakText(text: String, rate: Float = 1.0f, pitch: Float = 1.0f) {
+        viewModelScope.launch {
+            try {
+                if (!_modelState.value.isTTSLoaded) {
+                    _voiceState.value = _voiceState.value.copy(
+                        statusMessage = "Please load a TTS voice first"
+                    )
+                    return@launch
+                }
+
+                _voiceState.value = _voiceState.value.copy(
+                    isSpeaking = true,
+                    statusMessage = "Speaking..."
+                )
+
+                // Use the simple speak API that handles playback
+                RunAnywhere.speak(text)
+
+                _voiceState.value = _voiceState.value.copy(
+                    isSpeaking = false,
+                    statusMessage = "Speech complete"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error speaking: ${e.message}")
+                _voiceState.value = _voiceState.value.copy(
+                    isSpeaking = false,
+                    statusMessage = "Error speaking: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Stop current speech
+     */
+    fun stopSpeaking() {
+        viewModelScope.launch {
+            try {
+                RunAnywhere.stopSpeaking()
+                _voiceState.value = _voiceState.value.copy(
+                    isSpeaking = false,
+                    statusMessage = "Speech stopped"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error stopping speech: ${e.message}")
+            }
+        }
+    }
+
+    // ==================== Individual Component: VAD ====================
+
+    /**
+     * Detect voice activity in audio data
+     */
+    suspend fun detectVoiceActivity(audioData: ByteArray): Boolean {
+        return try {
+            val result = RunAnywhere.detectVoiceActivity(audioData)
+            _voiceState.value = _voiceState.value.copy(
+                confidence = result.confidence
+            )
+            result.hasSpeech
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in VAD: ${e.message}")
+            false
+        }
+    }
+
+    // ==================== Voice Agent Pipeline ====================
+
+    /**
+     * Start full voice agent session (VAD → STT → LLM → TTS)
+     */
+    fun startVoiceAgent() {
+        viewModelScope.launch {
+            try {
+                // Check if all models are loaded
+                if (!_modelState.value.isLLMLoaded || 
+                    !_modelState.value.isSTTLoaded || 
+                    !_modelState.value.isTTSLoaded) {
+                    _voiceState.value = _voiceState.value.copy(
+                        statusMessage = "Please load all models (LLM, STT, TTS) first"
+                    )
+                    return@launch
+                }
+
+                // Create audio flow
+                val audioFlow = createAudioFlow()
+
+                // Start voice session
+                _voiceState.value = _voiceState.value.copy(
+                    statusMessage = "Voice agent started - Listening..."
+                )
+
+                RunAnywhere.streamVoiceSession(audioFlow)
+                    .collect { event ->
+                        handleVoiceSessionEvent(event)
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in voice agent: ${e.message}")
+                _voiceState.value = _voiceState.value.copy(
+                    statusMessage = "Error: ${e.message}"
+                )
+            }
+        }
+    }
+
+    private fun handleVoiceSessionEvent(event: Any) {
+        // Note: Replace 'Any' with actual VoiceSessionEvent when SDK provides it
+        Log.d(TAG, "Voice session event: $event")
+        
+        // This is a placeholder - update based on actual SDK event types
+        when (event.toString()) {
+            "Started" -> {
+                _voiceState.value = _voiceState.value.copy(
+                    statusMessage = "Listening..."
+                )
+            }
+            "SpeechStarted" -> {
+                _voiceState.value = _voiceState.value.copy(
+                    statusMessage = "Speech detected..."
+                )
+            }
+            "Processing" -> {
+                _voiceState.value = _voiceState.value.copy(
+                    isProcessing = true,
+                    statusMessage = "Processing..."
+                )
+            }
+            else -> {
+                // Handle other events
+            }
+        }
+    }
+
+    /**
+     * Create audio flow for voice agent
+     */
+    private fun createAudioFlow(): Flow<ByteArray> = callbackFlow {
+        val recorder = AudioRecord(
+            MediaRecorder.AudioSource.MIC,
+            sampleRate,
+            channelConfig,
+            audioFormat,
+            bufferSize * 2
+        )
+        
+        recorder.startRecording()
+        val buffer = ByteArray(1600) // ~100ms at 16kHz
+
+        try {
+            while (true) {
+                val read = recorder.read(buffer, 0, buffer.size)
+                if (read > 0) {
+                    trySend(buffer.copyOf(read))
+                }
+            }
+        } finally {
+            recorder.stop()
+            recorder.release()
+        }
+
+        awaitClose {
+            recorder.stop()
+            recorder.release()
+        }
+    }
+
+    /**
+     * Stop voice agent session
+     */
+    fun stopVoiceAgent() {
+        viewModelScope.launch {
+            try {
+                RunAnywhere.stopVoiceSession()
+                _voiceState.value = _voiceState.value.copy(
+                    statusMessage = "Voice agent stopped"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error stopping voice agent: ${e.message}")
+            }
+        }
+    }
+
+    // ==================== Helper Methods ====================
+
+    private fun calculateAudioLevel(buffer: ByteArray, size: Int): Float {
+        var sum = 0L
+        for (i in 0 until size step 2) {
+            val sample = (buffer[i].toInt() or (buffer[i + 1].toInt() shl 8)).toShort()
+            sum += sample * sample
+        }
+        val rms = kotlin.math.sqrt(sum.toDouble() / (size / 2))
+        return (rms / 32768.0).toFloat().coerceIn(0f, 1f)
+    }
+
+    fun clearTranscription() {
+        _voiceState.value = _voiceState.value.copy(
+            transcribedText = "",
+            responseText = "",
+            statusMessage = "Ready"
+        )
+    }
+
+    fun refreshModels() {
+        loadAvailableModels()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        audioRecorder?.release()
+        audioTrack?.release()
+    }
+}
