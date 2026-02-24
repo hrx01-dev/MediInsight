@@ -1,5 +1,8 @@
 package com.runanywhere.navigation
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -17,10 +20,11 @@ import com.runanywhere.startup_hackathon20.ui_screens.NotificationsScreen
 import com.runanywhere.startup_hackathon20.ui_screens.OnboardingScreens
 import com.runanywhere.startup_hackathon20.ui_screens.SettingsScreen
 import com.runanywhere.startup_hackathon20.ui_screens.SplashScreen
+import androidx.navigation.NavBackStackEntry
 
 /**
  * Main navigation graph for the MediInsight application.
- * Handles navigation between all screens in the app.
+ * Handles navigation between all screens in the app with smooth animated transitions.
  */
 @Composable
 fun AppNavGraph(
@@ -28,14 +32,22 @@ fun AppNavGraph(
     onThemeChange: (String) -> Unit = {}
 ) {
     // State for theme in settings screen
-    val theme: MutableState<String> = remember { mutableStateOf("light") }
+    val theme: MutableState<String> = remember { mutableStateOf("neon") }
+    var currentRoute: String? = null
+    var previousRoute: String? = null
 
     NavHost(
         navController = navController,
         startDestination = Routes.Splash
     ) {
         // Splash Screen
-        composable(route = Routes.Splash) {
+        composable(
+            route = Routes.Splash,
+            enterTransition = { fadeIn() },
+            exitTransition = { fadeOut() }
+        ) {
+            previousRoute = currentRoute
+            currentRoute = Routes.Splash
             SplashScreen(
                 onComplete = {
                     navController.navigate(Routes.Onboard)
@@ -43,26 +55,60 @@ fun AppNavGraph(
             )
         }
 
-        // Onboarding Screen
-        composable(route = Routes.Onboard) {
+        // Onboarding Screen - Slide in from right
+        composable(
+            route = Routes.Onboard,
+            enterTransition = {
+                ScreenTransitions.slideInFromRightTransition().targetContentEnter
+            },
+            exitTransition = {
+                ScreenTransitions.slideInFromRightTransition().initialContentExit
+            }
+        ) {
+            previousRoute = currentRoute
+            currentRoute = Routes.Onboard
             OnboardingScreens(
                 onComplete = {
-                    navController.navigate(Routes.Auth)
+                    navController.navigate(Routes.Auth) {
+                        popUpTo(Routes.Onboard) { inclusive = true }
+                    }
                 }
             )
         }
 
-        // Authentication Screen
-        composable(route = Routes.Auth) {
+        // Authentication Screen - Slide in from right
+        composable(
+            route = Routes.Auth,
+            enterTransition = {
+                ScreenTransitions.slideInFromRightTransition().targetContentEnter
+            },
+            exitTransition = {
+                ScreenTransitions.slideInFromRightTransition().initialContentExit
+            }
+        ) {
+            previousRoute = currentRoute
+            currentRoute = Routes.Auth
             AuthScreen(
                 onComplete = {
-                    navController.navigate(Routes.Home)
+                    navController.navigate(Routes.Home) {
+                        popUpTo(Routes.Auth) { inclusive = true }
+                    }
                 }
             )
         }
 
-        // Home Screen
-        composable(route = Routes.Home) {
+        // Home Screen - Main hub (zoom in from previous screens)
+        composable(
+            route = Routes.Home,
+            enterTransition = {
+                ScreenTransitions.zoomInTransition().targetContentEnter
+            },
+            exitTransition = {
+                ScreenTransitions.zoomInTransition().initialContentExit
+            }
+        ) {
+            previousRoute = currentRoute
+            currentRoute = Routes.Home
             HomeScreen(
                 onNavigate = { route ->
                     when (route) {
@@ -77,8 +123,24 @@ fun AppNavGraph(
             )
         }
 
-        // Medical Insights Screen
-        composable(route = Routes.MedicalInsights) {
+        // Medical Insights Screen - Zoom in from home
+        composable(
+            route = Routes.MedicalInsights,
+            enterTransition = {
+                ScreenTransitions.zoomInTransition(duration = 500).targetContentEnter
+            },
+            exitTransition = {
+                ScreenTransitions.zoomOutTransition(duration = 400).initialContentExit
+            },
+            popEnterTransition = {
+                ScreenTransitions.zoomInTransition(duration = 400).targetContentEnter
+            },
+            popExitTransition = {
+                ScreenTransitions.zoomOutTransition(duration = 500).initialContentExit
+            }
+        ) {
+            previousRoute = currentRoute
+            currentRoute = Routes.MedicalInsights
             InsightsScreen(
                 onBack = {
                     navController.popBackStack()
@@ -86,8 +148,24 @@ fun AppNavGraph(
             )
         }
 
-        // Add Medicines Screen
-        composable(route = Routes.AddMedicines) {
+        // Add Medicines Screen - Slide from right
+        composable(
+            route = Routes.AddMedicines,
+            enterTransition = {
+                ScreenTransitions.slideInFromRightTransition().targetContentEnter
+            },
+            exitTransition = {
+                ScreenTransitions.slideOutHorizontally().initialContentExit
+            },
+            popEnterTransition = {
+                ScreenTransitions.slideInFromLeftTransition().targetContentEnter
+            },
+            popExitTransition = {
+                ScreenTransitions.slideInFromRightTransition().initialContentExit
+            }
+        ) {
+            previousRoute = currentRoute
+            currentRoute = Routes.AddMedicines
             AddMedicineScreen(
                 onBack = {
                     navController.popBackStack()
@@ -95,8 +173,24 @@ fun AppNavGraph(
             )
         }
 
-        // Settings Screen
-        composable(route = Routes.Settings) {
+        // Settings Screen - Slide up from bottom (modal)
+        composable(
+            route = Routes.Settings,
+            enterTransition = {
+                ScreenTransitions.slideUpFromBottomTransition(duration = 500).targetContentEnter
+            },
+            exitTransition = {
+                ScreenTransitions.slideDownFromTopTransition(duration = 500).initialContentExit
+            },
+            popEnterTransition = {
+                ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter
+            },
+            popExitTransition = {
+                ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit
+            }
+        ) {
+            previousRoute = currentRoute
+            currentRoute = Routes.Settings
             SettingsScreen(
                 theme = theme.value,
                 onThemeChange = { newTheme ->
@@ -115,8 +209,24 @@ fun AppNavGraph(
             )
         }
 
-        // Notifications Screen
-        composable(route = Routes.Notification) {
+        // Notifications Screen - Slide up from bottom (modal)
+        composable(
+            route = Routes.Notification,
+            enterTransition = {
+                ScreenTransitions.slideUpFromBottomTransition().targetContentEnter
+            },
+            exitTransition = {
+                ScreenTransitions.slideDownFromTopTransition().initialContentExit
+            },
+            popEnterTransition = {
+                ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter
+            },
+            popExitTransition = {
+                ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit
+            }
+        ) {
+            previousRoute = currentRoute
+            currentRoute = Routes.Notification
             NotificationsScreen(
                 onBack = {
                     navController.popBackStack()
@@ -124,8 +234,24 @@ fun AppNavGraph(
             )
         }
 
-        // Chat Screen
-        composable(route = Routes.Chat) {
+        // Chat Screen - Slide up from bottom (modal)
+        composable(
+            route = Routes.Chat,
+            enterTransition = {
+                ScreenTransitions.slideUpFromBottomTransition().targetContentEnter
+            },
+            exitTransition = {
+                ScreenTransitions.slideDownFromTopTransition().initialContentExit
+            },
+            popEnterTransition = {
+                ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter
+            },
+            popExitTransition = {
+                ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit
+            }
+        ) {
+            previousRoute = currentRoute
+            currentRoute = Routes.Chat
             ChatScreen(
                 onBack = {
                     navController.popBackStack()
@@ -133,15 +259,30 @@ fun AppNavGraph(
             )
         }
 
-        // Medicine Scanner Screen (OCR)
-        composable(route = Routes.MedicineScanner) {
+        // Medicine Scanner Screen - Bounce in
+        composable(
+            route = Routes.MedicineScanner,
+            enterTransition = {
+                ScreenTransitions.bounceInTransition(duration = 600).targetContentEnter
+            },
+            exitTransition = {
+                ScreenTransitions.bounceInTransition(duration = 400).initialContentExit
+            },
+            popEnterTransition = {
+                ScreenTransitions.bounceInTransition(duration = 500).targetContentEnter
+            },
+            popExitTransition = {
+                ScreenTransitions.bounceInTransition(duration = 400).initialContentExit
+            }
+        ) {
+            previousRoute = currentRoute
+            currentRoute = Routes.MedicineScanner
             MedicineScannerScreen(
                 onBack = {
                     navController.popBackStack()
                 },
                 onUseCapturedText = { capturedText ->
                     // Navigate to Add Medicine screen with captured text
-                    // You can pass the text as a navigation argument if needed
                     navController.navigate(Routes.AddMedicines)
                 }
             )
