@@ -17,6 +17,7 @@ import com.runanywhere.startup_hackathon20.ui_screens.NotificationsScreen
 import com.runanywhere.startup_hackathon20.ui_screens.OnboardingScreens
 import com.runanywhere.startup_hackathon20.ui_screens.SettingsScreen
 import com.runanywhere.startup_hackathon20.ui_screens.SplashScreen
+import com.runanywhere.startup_hackathon20.ui_screens.VoiceAssistantScreen
 
 /**
  * Main navigation graph for the MediInsight application.
@@ -143,6 +144,15 @@ fun AppNavGraph(
                     // Navigate to Add Medicine screen with captured text
                     // You can pass the text as a navigation argument if needed
                     navController.navigate(Routes.AddMedicines)
+                }
+            )
+        }
+
+        // Voice Assistant Screen
+        composable(route = Routes.VoiceAssistant) {
+            VoiceAssistantScreen(
+                onBack = {
+                    navController.popBackStack()
                 }
             )
         }
