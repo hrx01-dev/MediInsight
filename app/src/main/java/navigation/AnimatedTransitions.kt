@@ -1,14 +1,8 @@
 package com.runanywhere.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.EaseInBack
 import androidx.compose.animation.core.EaseInBounce
 import androidx.compose.animation.core.EaseInCubic
-import androidx.compose.animation.core.EaseInExpo
-import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.EaseOutBounce
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.tween
@@ -20,7 +14,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
-import androidx.navigation.NavBackStackEntry
 
 /**
  * Collection of reusable animated transitions for screen navigation
@@ -33,23 +26,16 @@ object ScreenTransitions {
      * Slide in from right with fade, slide out to left with fade
      * Best for: Forward navigation
      */
-    fun slideInFromRightTransition(
-        initial: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-            slideInHorizontally(
+    fun slideInFromRightTransition(): ContentTransform {
+        return ContentTransform(
+            targetContentEnter = slideInHorizontally(
                 initialOffsetX = { fullWidth -> fullWidth },
                 animationSpec = tween(durationMillis = 400, easing = EaseOutCubic)
-            ) + fadeIn(animationSpec = tween(durationMillis = 300))
-        },
-        exit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-            slideOutHorizontally(
+            ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+            initialContentExit = slideOutHorizontally(
                 targetOffsetX = { fullWidth -> -fullWidth / 2 },
                 animationSpec = tween(durationMillis = 300, easing = EaseInCubic)
-            ) + fadeOut(animationSpec = tween(durationMillis = 200))
-        }
-    ): ContentTransform {
-        return ContentTransform(
-            targetContentEnter = initial(this),
-            initialContentExit = exit(this),
+            ) + fadeOut(animationSpec = tween(durationMillis = 200)),
             targetContentZIndex = 1f
         )
     }
@@ -58,23 +44,16 @@ object ScreenTransitions {
      * Slide in from left with fade, slide out to right with fade
      * Best for: Back navigation
      */
-    fun slideInFromLeftTransition(
-        initial: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-            slideInHorizontally(
+    fun slideInFromLeftTransition(): ContentTransform {
+        return ContentTransform(
+            targetContentEnter = slideInHorizontally(
                 initialOffsetX = { fullWidth -> -fullWidth },
                 animationSpec = tween(durationMillis = 400, easing = EaseOutCubic)
-            ) + fadeIn(animationSpec = tween(durationMillis = 300))
-        },
-        exit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-            slideOutHorizontally(
+            ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+            initialContentExit = slideOutHorizontally(
                 targetOffsetX = { fullWidth -> fullWidth / 2 },
                 animationSpec = tween(durationMillis = 300, easing = EaseInCubic)
-            ) + fadeOut(animationSpec = tween(durationMillis = 200))
-        }
-    ): ContentTransform {
-        return ContentTransform(
-            targetContentEnter = initial(this),
-            initialContentExit = exit(this),
+            ) + fadeOut(animationSpec = tween(durationMillis = 200)),
             targetContentZIndex = 1f
         )
     }
@@ -106,7 +85,7 @@ object ScreenTransitions {
      */
     fun slideDownFromTopTransition(
         duration: Int = 500
-    ): ContentTransition {
+    ): ContentTransform {
         return ContentTransform(
             targetContentEnter = slideInVertically(
                 initialOffsetY = { fullHeight -> -fullHeight },
@@ -229,40 +208,5 @@ object ScreenTransitions {
             ) + fadeOut(animationSpec = tween(durationMillis = 200)),
             targetContentZIndex = 1f
         )
-    }
-
-    // ==================== ROUTE-SPECIFIC TRANSITIONS ====================
-    /**
-     * Determine transition based on navigation route
-     * Provides consistent animations throughout the app
-     */
-    fun getTransitionForRoute(
-        fromRoute: String?,
-        toRoute: String?
-    ): ContentTransform {
-        return when {
-            // Modal screens (slide up from bottom)
-            toRoute in listOf(Routes.Settings, Routes.Notification, Routes.Chat) -> {
-                slideUpFromBottomTransition()
-            }
-            // Detail screens from Home (zoom in)
-            fromRoute == Routes.Home && toRoute in listOf(
-                Routes.MedicalInsights,
-                Routes.AddMedicines,
-                Routes.MedicineScanner
-            ) -> {
-                zoomInTransition()
-            }
-            // Back from detail screens (zoom out)
-            toRoute == Routes.Home -> {
-                zoomOutTransition()
-            }
-            // Authentication flow (slide from right)
-            toRoute in listOf(Routes.Auth, Routes.Onboard) -> {
-                slideInFromRightTransition()
-            }
-            // Default: smooth slide and scale
-            else -> slideScaleTransition()
-        }
     }
 }

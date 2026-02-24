@@ -3,6 +3,8 @@ package com.runanywhere.navigation
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.EaseInCubic
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -58,12 +60,8 @@ fun AppNavGraph(
         // Onboarding Screen - Slide in from right
         composable(
             route = Routes.Onboard,
-            enterTransition = {
-                ScreenTransitions.slideInFromRightTransition().targetContentEnter
-            },
-            exitTransition = {
-                ScreenTransitions.slideInFromRightTransition().initialContentExit
-            }
+            enterTransition = { ScreenTransitions.slideInFromRightTransition().targetContentEnter },
+            exitTransition = { ScreenTransitions.slideInFromRightTransition().initialContentExit }
         ) {
             previousRoute = currentRoute
             currentRoute = Routes.Onboard
@@ -79,12 +77,8 @@ fun AppNavGraph(
         // Authentication Screen - Slide in from right
         composable(
             route = Routes.Auth,
-            enterTransition = {
-                ScreenTransitions.slideInFromRightTransition().targetContentEnter
-            },
-            exitTransition = {
-                ScreenTransitions.slideInFromRightTransition().initialContentExit
-            }
+            enterTransition = { ScreenTransitions.slideInFromRightTransition().targetContentEnter },
+            exitTransition = { ScreenTransitions.slideInFromRightTransition().initialContentExit }
         ) {
             previousRoute = currentRoute
             currentRoute = Routes.Auth
@@ -100,12 +94,8 @@ fun AppNavGraph(
         // Home Screen - Main hub (zoom in from previous screens)
         composable(
             route = Routes.Home,
-            enterTransition = {
-                ScreenTransitions.zoomInTransition().targetContentEnter
-            },
-            exitTransition = {
-                ScreenTransitions.zoomInTransition().initialContentExit
-            }
+            enterTransition = { ScreenTransitions.zoomInTransition().targetContentEnter },
+            exitTransition = { ScreenTransitions.zoomInTransition().initialContentExit }
         ) {
             previousRoute = currentRoute
             currentRoute = Routes.Home
@@ -126,18 +116,10 @@ fun AppNavGraph(
         // Medical Insights Screen - Zoom in from home
         composable(
             route = Routes.MedicalInsights,
-            enterTransition = {
-                ScreenTransitions.zoomInTransition(duration = 500).targetContentEnter
-            },
-            exitTransition = {
-                ScreenTransitions.zoomOutTransition(duration = 400).initialContentExit
-            },
-            popEnterTransition = {
-                ScreenTransitions.zoomInTransition(duration = 400).targetContentEnter
-            },
-            popExitTransition = {
-                ScreenTransitions.zoomOutTransition(duration = 500).initialContentExit
-            }
+            enterTransition = { ScreenTransitions.zoomInTransition(duration = 500).targetContentEnter },
+            exitTransition = { ScreenTransitions.zoomOutTransition(duration = 400).initialContentExit },
+            popEnterTransition = { ScreenTransitions.zoomInTransition(duration = 400).targetContentEnter },
+            popExitTransition = { ScreenTransitions.zoomOutTransition(duration = 500).initialContentExit }
         ) {
             previousRoute = currentRoute
             currentRoute = Routes.MedicalInsights
@@ -151,18 +133,15 @@ fun AppNavGraph(
         // Add Medicines Screen - Slide from right
         composable(
             route = Routes.AddMedicines,
-            enterTransition = {
-                ScreenTransitions.slideInFromRightTransition().targetContentEnter
+            enterTransition = { ScreenTransitions.slideInFromRightTransition().targetContentEnter },
+            exitTransition = { 
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(durationMillis = 300, easing = EaseInCubic)
+                ) + fadeOut(animationSpec = tween(durationMillis = 200))
             },
-            exitTransition = {
-                ScreenTransitions.slideOutHorizontally().initialContentExit
-            },
-            popEnterTransition = {
-                ScreenTransitions.slideInFromLeftTransition().targetContentEnter
-            },
-            popExitTransition = {
-                ScreenTransitions.slideInFromRightTransition().initialContentExit
-            }
+            popEnterTransition = { ScreenTransitions.slideInFromLeftTransition().targetContentEnter },
+            popExitTransition = { ScreenTransitions.slideInFromRightTransition().initialContentExit }
         ) {
             previousRoute = currentRoute
             currentRoute = Routes.AddMedicines
@@ -176,18 +155,10 @@ fun AppNavGraph(
         // Settings Screen - Slide up from bottom (modal)
         composable(
             route = Routes.Settings,
-            enterTransition = {
-                ScreenTransitions.slideUpFromBottomTransition(duration = 500).targetContentEnter
-            },
-            exitTransition = {
-                ScreenTransitions.slideDownFromTopTransition(duration = 500).initialContentExit
-            },
-            popEnterTransition = {
-                ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter
-            },
-            popExitTransition = {
-                ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit
-            }
+            enterTransition = { ScreenTransitions.slideUpFromBottomTransition(duration = 500).targetContentEnter },
+            exitTransition = { ScreenTransitions.slideDownFromTopTransition(duration = 500).initialContentExit },
+            popEnterTransition = { ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter },
+            popExitTransition = { ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit }
         ) {
             previousRoute = currentRoute
             currentRoute = Routes.Settings
@@ -212,18 +183,10 @@ fun AppNavGraph(
         // Notifications Screen - Slide up from bottom (modal)
         composable(
             route = Routes.Notification,
-            enterTransition = {
-                ScreenTransitions.slideUpFromBottomTransition().targetContentEnter
-            },
-            exitTransition = {
-                ScreenTransitions.slideDownFromTopTransition().initialContentExit
-            },
-            popEnterTransition = {
-                ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter
-            },
-            popExitTransition = {
-                ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit
-            }
+            enterTransition = { ScreenTransitions.slideUpFromBottomTransition().targetContentEnter },
+            exitTransition = { ScreenTransitions.slideDownFromTopTransition().initialContentExit },
+            popEnterTransition = { ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter },
+            popExitTransition = { ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit }
         ) {
             previousRoute = currentRoute
             currentRoute = Routes.Notification
@@ -237,18 +200,10 @@ fun AppNavGraph(
         // Chat Screen - Slide up from bottom (modal)
         composable(
             route = Routes.Chat,
-            enterTransition = {
-                ScreenTransitions.slideUpFromBottomTransition().targetContentEnter
-            },
-            exitTransition = {
-                ScreenTransitions.slideDownFromTopTransition().initialContentExit
-            },
-            popEnterTransition = {
-                ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter
-            },
-            popExitTransition = {
-                ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit
-            }
+            enterTransition = { ScreenTransitions.slideUpFromBottomTransition().targetContentEnter },
+            exitTransition = { ScreenTransitions.slideDownFromTopTransition().initialContentExit },
+            popEnterTransition = { ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter },
+            popExitTransition = { ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit }
         ) {
             previousRoute = currentRoute
             currentRoute = Routes.Chat
@@ -262,18 +217,10 @@ fun AppNavGraph(
         // Medicine Scanner Screen - Bounce in
         composable(
             route = Routes.MedicineScanner,
-            enterTransition = {
-                ScreenTransitions.bounceInTransition(duration = 600).targetContentEnter
-            },
-            exitTransition = {
-                ScreenTransitions.bounceInTransition(duration = 400).initialContentExit
-            },
-            popEnterTransition = {
-                ScreenTransitions.bounceInTransition(duration = 500).targetContentEnter
-            },
-            popExitTransition = {
-                ScreenTransitions.bounceInTransition(duration = 400).initialContentExit
-            }
+            enterTransition = { ScreenTransitions.bounceInTransition(duration = 600).targetContentEnter },
+            exitTransition = { ScreenTransitions.bounceInTransition(duration = 400).initialContentExit },
+            popEnterTransition = { ScreenTransitions.bounceInTransition(duration = 500).targetContentEnter },
+            popExitTransition = { ScreenTransitions.bounceInTransition(duration = 400).initialContentExit }
         ) {
             previousRoute = currentRoute
             currentRoute = Routes.MedicineScanner
