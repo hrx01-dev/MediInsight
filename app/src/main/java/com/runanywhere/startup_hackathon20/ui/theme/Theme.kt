@@ -71,11 +71,96 @@ private val DarkColorScheme = darkColorScheme(
     onError = Black
 )
 
+// ==================== VIBRANT NEON THEME (DEFAULT) ====================
+private val NeonColorScheme = lightColorScheme(
+    primary = NeonPrimary,
+    onPrimary = White,
+    primaryContainer = androidx.compose.ui.graphics.Color(0xFFE879F9),
+    onPrimaryContainer = Black,
+
+    secondary = NeonSecondary,
+    onSecondary = Black,
+    secondaryContainer = androidx.compose.ui.graphics.Color(0xFF37E5F7),
+    onSecondaryContainer = Black,
+
+    tertiary = NeonTertiary,
+    onTertiary = White,
+
+    background = NeonBackground,
+    onBackground = Black,
+
+    surface = NeonSurface,
+    onSurface = Black,
+
+    surfaceVariant = LightGray,
+    onSurfaceVariant = DarkGray,
+
+    error = androidx.compose.ui.graphics.Color(0xFFEF4444),
+    onError = White
+)
+
+// ==================== VIBRANT ORANGE THEME ====================
+private val OrangeColorScheme = lightColorScheme(
+    primary = OrangePrimary,
+    onPrimary = White,
+    primaryContainer = androidx.compose.ui.graphics.Color(0xFFFFB399),
+    onPrimaryContainer = Black,
+
+    secondary = OrangeSecondary,
+    onSecondary = Black,
+    secondaryContainer = androidx.compose.ui.graphics.Color(0xFFFFD460),
+    onSecondaryContainer = Black,
+
+    tertiary = OrangeTertiary,
+    onTertiary = White,
+
+    background = OrangeBackground,
+    onBackground = Black,
+
+    surface = OrangeSurface,
+    onSurface = Black,
+
+    surfaceVariant = LightGray,
+    onSurfaceVariant = DarkGray,
+
+    error = androidx.compose.ui.graphics.Color(0xFFEF4444),
+    onError = White
+)
+
+// ==================== VIBRANT TEAL THEME ====================
+private val TealColorScheme = lightColorScheme(
+    primary = TealPrimary,
+    onPrimary = White,
+    primaryContainer = androidx.compose.ui.graphics.Color(0xFF3DE5E5),
+    onPrimaryContainer = Black,
+
+    secondary = TealSecondary,
+    onSecondary = Black,
+    secondaryContainer = androidx.compose.ui.graphics.Color(0xFF37E5F7),
+    onSecondaryContainer = Black,
+
+    tertiary = TealTertiary,
+    onTertiary = White,
+
+    background = TealBackground,
+    onBackground = Black,
+
+    surface = TealSurface,
+    onSurface = Black,
+
+    surfaceVariant = LightGray,
+    onSurfaceVariant = DarkGray,
+
+    error = androidx.compose.ui.graphics.Color(0xFFEF4444),
+    onError = White
+)
+
 @Composable
 fun Startup_hackathon20Theme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false, // Disabled to use our custom theme
+    themeMode: String = "neon", // "neon", "orange", "teal", "green", "dark"
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -83,9 +168,11 @@ fun Startup_hackathon20Theme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
-        darkTheme -> DarkColorScheme
-        else -> LightGreenColorScheme
+        themeMode == "dark" -> DarkColorScheme
+        themeMode == "green" -> LightGreenColorScheme
+        themeMode == "orange" -> OrangeColorScheme
+        themeMode == "teal" -> TealColorScheme
+        else -> NeonColorScheme // Default to vibrant neon theme
     }
 
     val view = LocalView.current

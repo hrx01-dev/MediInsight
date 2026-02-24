@@ -9,6 +9,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Waves
+import androidx.compose.material.icons.filled.Eco
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -88,13 +91,18 @@ fun SettingsScreen(
                         Modifier
                             .size(45.dp)
                             .background(
-                                if (theme == "light") Color(0xFFFBBF24) else Color(0xFF4F46E5),
+                                when (theme) {
+                                    "neon" -> Color(0xFFD946EF)
+                                    "orange" -> Color(0xFFFF6B35)
+                                    "teal" -> Color(0xFF0891B2)
+                                    else -> Color(0xFF4CAF50)
+                                },
                                 RoundedCornerShape(12.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            if (theme == "light") Icons.Default.WbSunny else Icons.Default.DarkMode,
+                            Icons.Default.Palette,
                             contentDescription = null,
                             tint = Color.White
                         )
@@ -105,7 +113,14 @@ fun SettingsScreen(
                     Column(Modifier.weight(1f)) {
                         Text("Theme", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            if (theme == "light") "Light Mode" else "Dark Mode",
+                            when (theme) {
+                                "neon" -> "Vibrant Neon"
+                                "orange" -> "Vibrant Orange"
+                                "teal" -> "Vibrant Teal"
+                                "green" -> "Light Green"
+                                "dark" -> "Dark Mode"
+                                else -> "Vibrant Neon"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.Gray
                         )
@@ -124,16 +139,55 @@ fun SettingsScreen(
 
                     Column(Modifier.padding(16.dp)) {
 
-                        // LIGHT THEME OPTION
+                        // VIBRANT NEON THEME OPTION (DEFAULT)
                         ThemeOption(
-                            selected = theme == "light",
-                            title = "Light Mode",
-                            subtitle = "Green & White",
+                            selected = theme == "neon",
+                            title = "Vibrant Neon",
+                            subtitle = "Purple & Cyan - Default",
+                            gradient = Brush.horizontalGradient(
+                                listOf(Color(0xFFD946EF), Color(0xFF06B6D4))
+                            ),
+                            icon = Icons.Default.Palette
+                        ) { onThemeChange("neon") }
+
+                        Spacer(Modifier.height(14.dp))
+
+                        // VIBRANT ORANGE THEME OPTION
+                        ThemeOption(
+                            selected = theme == "orange",
+                            title = "Vibrant Orange",
+                            subtitle = "Warm Sunset Colors",
+                            gradient = Brush.horizontalGradient(
+                                listOf(Color(0xFFFF6B35), Color(0xFFFFB703))
+                            ),
+                            icon = Icons.Default.WbSunny
+                        ) { onThemeChange("orange") }
+
+                        Spacer(Modifier.height(14.dp))
+
+                        // VIBRANT TEAL THEME OPTION
+                        ThemeOption(
+                            selected = theme == "teal",
+                            title = "Vibrant Teal",
+                            subtitle = "Ocean-Inspired Blues",
+                            gradient = Brush.horizontalGradient(
+                                listOf(Color(0xFF0891B2), Color(0xFF14B8A6))
+                            ),
+                            icon = Icons.Default.Waves
+                        ) { onThemeChange("teal") }
+
+                        Spacer(Modifier.height(14.dp))
+
+                        // LIGHT GREEN THEME OPTION
+                        ThemeOption(
+                            selected = theme == "green",
+                            title = "Light Green",
+                            subtitle = "Natural & Calming",
                             gradient = Brush.horizontalGradient(
                                 listOf(Color(0xFFE8FDEB), Color(0xFFD1FADF))
                             ),
-                            icon = Icons.Default.WbSunny
-                        ) { onThemeChange("light") }
+                            icon = Icons.Default.Eco
+                        ) { onThemeChange("green") }
 
                         Spacer(Modifier.height(14.dp))
 
@@ -376,12 +430,54 @@ fun ThemeOption(
     }
 }
 
-@Preview(showBackground = true, showSystemUi = true, name = "Settings Screen - Light Theme")
+@Preview(showBackground = true, showSystemUi = true, name = "Settings Screen - Neon Theme (Default)")
 @Composable
-fun SettingsScreenLightPreview() {
-    Startup_hackathon20Theme {
+fun SettingsScreenNeonPreview() {
+    Startup_hackathon20Theme(themeMode = "neon") {
         SettingsScreen(
-            theme = "light",
+            theme = "neon",
+            onThemeChange = {},
+            onBack = {},
+            onLogout = {},
+            viewModel = null
+        )
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true, name = "Settings Screen - Orange Theme")
+@Composable
+fun SettingsScreenOrangePreview() {
+    Startup_hackathon20Theme(themeMode = "orange") {
+        SettingsScreen(
+            theme = "orange",
+            onThemeChange = {},
+            onBack = {},
+            onLogout = {},
+            viewModel = null
+        )
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true, name = "Settings Screen - Teal Theme")
+@Composable
+fun SettingsScreenTealPreview() {
+    Startup_hackathon20Theme(themeMode = "teal") {
+        SettingsScreen(
+            theme = "teal",
+            onThemeChange = {},
+            onBack = {},
+            onLogout = {},
+            viewModel = null
+        )
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true, name = "Settings Screen - Green Theme")
+@Composable
+fun SettingsScreenGreenPreview() {
+    Startup_hackathon20Theme(themeMode = "green") {
+        SettingsScreen(
+            theme = "green",
             onThemeChange = {},
             onBack = {},
             onLogout = {},
@@ -393,7 +489,7 @@ fun SettingsScreenLightPreview() {
 @Preview(showBackground = true, showSystemUi = true, name = "Settings Screen - Dark Theme")
 @Composable
 fun SettingsScreenDarkPreview() {
-    Startup_hackathon20Theme {
+    Startup_hackathon20Theme(themeMode = "dark") {
         SettingsScreen(
             theme = "dark",
             onThemeChange = {},
@@ -404,17 +500,36 @@ fun SettingsScreenDarkPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Theme Option - Light", widthDp = 350)
+@Preview(showBackground = true, name = "Theme Option - Neon", widthDp = 350)
 @Composable
-fun ThemeOptionLightPreview() {
+fun ThemeOptionNeonPreview() {
     Startup_hackathon20Theme {
         Surface(modifier = Modifier.padding(16.dp)) {
             ThemeOption(
                 selected = true,
-                title = "Light Mode",
-                subtitle = "Green & White",
+                title = "Vibrant Neon",
+                subtitle = "Purple & Cyan - Default",
                 gradient = Brush.horizontalGradient(
-                    listOf(Color(0xFFE8FDEB), Color(0xFFD1FADF))
+                    listOf(Color(0xFFD946EF), Color(0xFF06B6D4))
+                ),
+                icon = Icons.Default.Palette,
+                onClick = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Theme Option - Orange", widthDp = 350)
+@Composable
+fun ThemeOptionOrangePreview() {
+    Startup_hackathon20Theme {
+        Surface(modifier = Modifier.padding(16.dp)) {
+            ThemeOption(
+                selected = false,
+                title = "Vibrant Orange",
+                subtitle = "Warm Sunset Colors",
+                gradient = Brush.horizontalGradient(
+                    listOf(Color(0xFFFF6B35), Color(0xFFFFB703))
                 ),
                 icon = Icons.Default.WbSunny,
                 onClick = {}
@@ -423,19 +538,19 @@ fun ThemeOptionLightPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Theme Option - Dark", widthDp = 350)
+@Preview(showBackground = true, name = "Theme Option - Teal", widthDp = 350)
 @Composable
-fun ThemeOptionDarkPreview() {
+fun ThemeOptionTealPreview() {
     Startup_hackathon20Theme {
         Surface(modifier = Modifier.padding(16.dp)) {
             ThemeOption(
                 selected = false,
-                title = "Dark Mode",
-                subtitle = "Slate & Indigo",
+                title = "Vibrant Teal",
+                subtitle = "Ocean-Inspired Blues",
                 gradient = Brush.horizontalGradient(
-                    listOf(Color(0xFF1E293B), Color(0xFF312E81))
+                    listOf(Color(0xFF0891B2), Color(0xFF14B8A6))
                 ),
-                icon = Icons.Default.DarkMode,
+                icon = Icons.Default.Waves,
                 onClick = {}
             )
         }
