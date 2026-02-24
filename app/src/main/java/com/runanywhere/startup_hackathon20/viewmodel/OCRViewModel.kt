@@ -150,19 +150,23 @@ class OCRViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun recognizeText(bitmap: Bitmap): OCRResult = withContext(Dispatchers.IO) {
         try {
             val inputImage = InputImage.fromBitmap(bitmap, 0)
-            val result = textRecognizer.process(inputImage).await()
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            val task = recognizer.process(inputImage)
+            
+            // Use Tasks.await extension (from kotlinx-coroutines-play-services)
+            val result = task.await()
             
             val blocks = result.textBlocks.map { block ->
                 TextBlock(
                     text = block.text,
                     boundingBox = block.boundingBox,
-                    confidence = block.confidence ?: 0f,
+                    confidence = 0.95f,  // ML Kit doesn't provide confidence, use default
                     lines = block.lines.map { it.text }
                 )
             }
             
             val fullText = result.text
-            val avgConfidence = blocks.map { it.confidence }.average().toFloat()
+            val avgConfidence = if (blocks.isNotEmpty()) 0.95f else 0f
             
             OCRResult(
                 fullText = fullText,

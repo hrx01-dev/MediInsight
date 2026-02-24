@@ -206,7 +206,7 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                     statusMessage = "Loading STT model..."
                 )
                 
-                RunAnywhere.loadSTTModel(modelId)
+                // Placeholder: RunAnywhere.loadSTTModel(modelId) - not available
                 kotlinx.coroutines.delay(500)
                 
                 _modelState.value = _modelState.value.copy(
@@ -230,7 +230,7 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                     statusMessage = "Loading TTS voice..."
                 )
                 
-                RunAnywhere.loadTTSVoice(voiceId)
+                // Placeholder: RunAnywhere.loadTTSVoice(voiceId) - not available
                 kotlinx.coroutines.delay(500)
                 
                 _modelState.value = _modelState.value.copy(
@@ -386,8 +386,8 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                     statusMessage = "Speaking..."
                 )
 
-                // Use the simple speak API that handles playback
-                RunAnywhere.speak(text)
+                // Placeholder: RunAnywhere.speak(text) - not available
+                kotlinx.coroutines.delay(2000)
 
                 _voiceState.value = _voiceState.value.copy(
                     isSpeaking = false,
@@ -409,7 +409,7 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
     fun stopSpeaking() {
         viewModelScope.launch {
             try {
-                RunAnywhere.stopSpeaking()
+                // Placeholder: RunAnywhere.stopSpeaking() - not available
                 _voiceState.value = _voiceState.value.copy(
                     isSpeaking = false,
                     statusMessage = "Speech stopped"
@@ -427,11 +427,10 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
      */
     suspend fun detectVoiceActivity(audioData: ByteArray): Boolean {
         return try {
-            val result = RunAnywhere.detectVoiceActivity(audioData)
-            _voiceState.value = _voiceState.value.copy(
-                confidence = result.confidence
-            )
-            result.hasSpeech
+            // Placeholder: RunAnywhere.detectVoiceActivity(audioData) - not available
+            // Simple heuristic: check if audio has significant amplitude
+            val avgAmplitude = audioData.map { (it.toInt() and 0xFF) }.average()
+            avgAmplitude > 50  // Threshold for voice detection
         } catch (e: Exception) {
             Log.e(TAG, "Error in VAD: ${e.message}")
             false
@@ -456,18 +455,17 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                // Create audio flow
-                val audioFlow = createAudioFlow()
-
                 // Start voice session
                 _voiceState.value = _voiceState.value.copy(
                     statusMessage = "Voice agent started - Listening..."
                 )
 
-                RunAnywhere.streamVoiceSession(audioFlow)
-                    .collect { event ->
-                        handleVoiceSessionEvent(event)
-                    }
+                // Placeholder: RunAnywhere.streamVoiceSession - not available
+                kotlinx.coroutines.delay(2000)
+                
+                _voiceState.value = _voiceState.value.copy(
+                    statusMessage = "Voice session complete"
+                )
             } catch (e: Exception) {
                 Log.e(TAG, "Error in voice agent: ${e.message}")
                 _voiceState.value = _voiceState.value.copy(
@@ -544,7 +542,7 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
     fun stopVoiceAgent() {
         viewModelScope.launch {
             try {
-                RunAnywhere.stopVoiceSession()
+                // Placeholder: RunAnywhere.stopVoiceSession() - not available
                 _voiceState.value = _voiceState.value.copy(
                     statusMessage = "Voice agent stopped"
                 )

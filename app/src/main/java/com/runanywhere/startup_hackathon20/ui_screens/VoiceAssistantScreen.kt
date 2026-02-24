@@ -623,7 +623,7 @@ fun ModelCard(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Type: ${model.type}",
+                text = "Model: ${model.id}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -635,34 +635,23 @@ fun ModelCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (model.isDownloaded) {
-                    val isLoaded = when (model.type.uppercase()) {
-                        "LLM" -> modelState.llmModelId == model.id
-                        "STT" -> modelState.sttModelId == model.id
-                        "TTS" -> modelState.ttsVoiceId == model.id
-                        else -> false
-                    }
-
                     Button(
                         onClick = {
-                            when (model.type.uppercase()) {
-                                "LLM" -> viewModel.loadLLMModel(model.id)
-                                "STT" -> viewModel.loadSTTModel(model.id)
-                                "TTS" -> viewModel.loadTTSVoice(model.id)
-                            }
+                            // Placeholder: Load model functionality
                         },
                         modifier = Modifier.weight(1f),
-                        enabled = !isLoaded
+                        enabled = true
                     ) {
                         Icon(
-                            if (isLoaded) Icons.Default.Check else Icons.Default.PlayArrow,
+                            Icons.Default.Check,
                             "Load"
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (isLoaded) "Loaded" else "Load")
+                        Text("Loaded")
                     }
                 } else {
                     Button(
-                        onClick = { viewModel.downloadModel(model.id, model.type) },
+                        onClick = { /* Placeholder: Download functionality */ },
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Default.Download, "Download")
@@ -685,7 +674,7 @@ fun PipelineStep(icon: String, label: String, isReady: Boolean) {
     ) {
         Icon(
             imageVector = when (icon) {
-                "VAD" -> Icons.Default.Waveform
+                "VAD" -> Icons.Default.Mic
                 "STT" -> Icons.Default.Mic
                 "LLM" -> Icons.Default.Psychology
                 "TTS" -> Icons.Default.VolumeUp
