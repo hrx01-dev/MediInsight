@@ -9,5 +9,6 @@ object Routes {
     const val AddMedicines = "add_medicines"
     const val Settings = "settings"
     const val Notification = "notification"
-    const val Chat="chat"
+    const val Chat = "chat"
+    const val MedicineScanner = "medicine_scanner"
 }

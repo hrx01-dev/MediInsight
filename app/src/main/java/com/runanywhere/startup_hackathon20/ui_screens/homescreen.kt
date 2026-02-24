@@ -44,6 +44,7 @@ fun HomeScreen(
 
     val categories = listOf(
         Category(Icons.Default.Add, "Add Medicine", listOf(Color(0xFF4CAF50), Color(0xFF2ECC71))),
+        Category(Icons.Default.CameraAlt, "Scan Label", listOf(Color(0xFF3B82F6), Color(0xFF2563EB))),
         Category(Icons.Default.Insights, "Insights", listOf(Color(0xFF2ECC71), Color(0xFF4CAF50)))
     )
 
@@ -169,6 +170,7 @@ fun HomeScreen(
                         onNavigate(
                             when (category.title) {
                                 "Add Medicine" -> "addMedicine"
+                                "Scan Label" -> "scanner"
                                 "Insights" -> "insights"
                                 else -> ""
                             }

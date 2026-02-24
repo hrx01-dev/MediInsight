@@ -12,6 +12,7 @@ import com.runanywhere.startup_hackathon20.ui_screens.AuthScreen
 import com.runanywhere.startup_hackathon20.ui_screens.ChatScreen
 import com.runanywhere.startup_hackathon20.ui_screens.HomeScreen
 import com.runanywhere.startup_hackathon20.ui_screens.InsightsScreen
+import com.runanywhere.startup_hackathon20.ui_screens.MedicineScannerScreen
 import com.runanywhere.startup_hackathon20.ui_screens.NotificationsScreen
 import com.runanywhere.startup_hackathon20.ui_screens.OnboardingScreens
 import com.runanywhere.startup_hackathon20.ui_screens.SettingsScreen
@@ -67,6 +68,7 @@ fun AppNavGraph(
                     when (route) {
                         "insights" -> navController.navigate(Routes.MedicalInsights)
                         "addMedicine" -> navController.navigate(Routes.AddMedicines)
+                        "scanner" -> navController.navigate(Routes.MedicineScanner)
                         "settings" -> navController.navigate(Routes.Settings)
                         "notifications" -> navController.navigate(Routes.Notification)
                         "chat" -> navController.navigate(Routes.Chat)
@@ -127,6 +129,20 @@ fun AppNavGraph(
             ChatScreen(
                 onBack = {
                     navController.popBackStack()
+                }
+            )
+        }
+
+        // Medicine Scanner Screen (OCR)
+        composable(route = Routes.MedicineScanner) {
+            MedicineScannerScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onUseCapturedText = { capturedText ->
+                    // Navigate to Add Medicine screen with captured text
+                    // You can pass the text as a navigation argument if needed
+                    navController.navigate(Routes.AddMedicines)
                 }
             )
         }
