@@ -22,7 +22,6 @@ import com.runanywhere.startup_hackathon20.ui_screens.NotificationsScreen
 import com.runanywhere.startup_hackathon20.ui_screens.OnboardingScreens
 import com.runanywhere.startup_hackathon20.ui_screens.SettingsScreen
 import com.runanywhere.startup_hackathon20.ui_screens.SplashScreen
-import androidx.navigation.NavBackStackEntry
 
 /**
  * Main navigation graph for the MediInsight application.
@@ -35,8 +34,6 @@ fun AppNavGraph(
 ) {
     // State for theme in settings screen
     val theme: MutableState<String> = remember { mutableStateOf("neon") }
-    var currentRoute: String? = null
-    var previousRoute: String? = null
 
     NavHost(
         navController = navController,
@@ -48,8 +45,6 @@ fun AppNavGraph(
             enterTransition = { fadeIn() },
             exitTransition = { fadeOut() }
         ) {
-            previousRoute = currentRoute
-            currentRoute = Routes.Splash
             SplashScreen(
                 onComplete = {
                     navController.navigate(Routes.Onboard)
@@ -63,8 +58,6 @@ fun AppNavGraph(
             enterTransition = { ScreenTransitions.slideInFromRightTransition().targetContentEnter },
             exitTransition = { ScreenTransitions.slideInFromRightTransition().initialContentExit }
         ) {
-            previousRoute = currentRoute
-            currentRoute = Routes.Onboard
             OnboardingScreens(
                 onComplete = {
                     navController.navigate(Routes.Auth) {
@@ -80,8 +73,6 @@ fun AppNavGraph(
             enterTransition = { ScreenTransitions.slideInFromRightTransition().targetContentEnter },
             exitTransition = { ScreenTransitions.slideInFromRightTransition().initialContentExit }
         ) {
-            previousRoute = currentRoute
-            currentRoute = Routes.Auth
             AuthScreen(
                 onComplete = {
                     navController.navigate(Routes.Home) {
@@ -97,8 +88,6 @@ fun AppNavGraph(
             enterTransition = { ScreenTransitions.zoomInTransition().targetContentEnter },
             exitTransition = { ScreenTransitions.zoomInTransition().initialContentExit }
         ) {
-            previousRoute = currentRoute
-            currentRoute = Routes.Home
             HomeScreen(
                 onNavigate = { route ->
                     when (route) {
@@ -121,8 +110,6 @@ fun AppNavGraph(
             popEnterTransition = { ScreenTransitions.zoomInTransition(duration = 400).targetContentEnter },
             popExitTransition = { ScreenTransitions.zoomOutTransition(duration = 500).initialContentExit }
         ) {
-            previousRoute = currentRoute
-            currentRoute = Routes.MedicalInsights
             InsightsScreen(
                 onBack = {
                     navController.popBackStack()
@@ -143,8 +130,6 @@ fun AppNavGraph(
             popEnterTransition = { ScreenTransitions.slideInFromLeftTransition().targetContentEnter },
             popExitTransition = { ScreenTransitions.slideInFromRightTransition().initialContentExit }
         ) {
-            previousRoute = currentRoute
-            currentRoute = Routes.AddMedicines
             AddMedicineScreen(
                 onBack = {
                     navController.popBackStack()
@@ -160,8 +145,6 @@ fun AppNavGraph(
             popEnterTransition = { ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter },
             popExitTransition = { ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit }
         ) {
-            previousRoute = currentRoute
-            currentRoute = Routes.Settings
             SettingsScreen(
                 theme = theme.value,
                 onThemeChange = { newTheme ->
@@ -188,8 +171,6 @@ fun AppNavGraph(
             popEnterTransition = { ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter },
             popExitTransition = { ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit }
         ) {
-            previousRoute = currentRoute
-            currentRoute = Routes.Notification
             NotificationsScreen(
                 onBack = {
                     navController.popBackStack()
@@ -205,8 +186,6 @@ fun AppNavGraph(
             popEnterTransition = { ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter },
             popExitTransition = { ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit }
         ) {
-            previousRoute = currentRoute
-            currentRoute = Routes.Chat
             ChatScreen(
                 onBack = {
                     navController.popBackStack()
@@ -222,8 +201,6 @@ fun AppNavGraph(
             popEnterTransition = { ScreenTransitions.bounceInTransition(duration = 500).targetContentEnter },
             popExitTransition = { ScreenTransitions.bounceInTransition(duration = 400).initialContentExit }
         ) {
-            previousRoute = currentRoute
-            currentRoute = Routes.MedicineScanner
             MedicineScannerScreen(
                 onBack = {
                     navController.popBackStack()
