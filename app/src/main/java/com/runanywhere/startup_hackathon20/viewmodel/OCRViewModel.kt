@@ -156,13 +156,18 @@ class OCRViewModel(application: Application) : AndroidViewModel(application) {
             // Use Tasks.await extension (from kotlinx-coroutines-play-services)
             val result = task.await()
             
-            val blocks = result.textBlocks.map { block ->
-                TextBlock(
-                    text = block.text,
-                    boundingBox = block.boundingBox,
-                    confidence = 0.95f,  // ML Kit doesn't provide confidence, use default
-                    lines = block.lines.map { it.text }
-                )
+            // Extract text blocks - ML Kit TextBlock has: text, boundingBox, lines, confidence (optional)
+            val blocks = result.textBlocks.mapNotNull { block ->
+                try {
+                    TextBlock(
+                        text = block.text,
+                        boundingBox = block.boundingBox,
+                        confidence = 0.95f,
+                        lines = block.lines.map { it.text }
+                    )
+                } catch (e: Exception) {
+                    null
+                }
             }
             
             val fullText = result.text

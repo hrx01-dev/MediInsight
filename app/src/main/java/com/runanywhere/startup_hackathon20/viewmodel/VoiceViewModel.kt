@@ -110,13 +110,11 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val downloadedModels = _availableModels.value.filter { it.isDownloaded }
             
-            // Try to load an LLM if available
-            val llmModel = downloadedModels.firstOrNull { 
-                it.type.equals("LLM", ignoreCase = true) 
-            }
+            // Try to load first downloaded model
+            val firstModel = downloadedModels.firstOrNull()
             
-            if (llmModel != null) {
-                loadLLMModel(llmModel.id)
+            if (firstModel != null) {
+                loadLLMModel(firstModel.id)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Auto-load failed: ${e.message}")
