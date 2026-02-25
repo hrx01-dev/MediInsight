@@ -44,7 +44,8 @@ fun HomeScreen(
 
     val categories = listOf(
         Category(Icons.Default.Add, "Add Medicine", listOf(Color(0xFF4CAF50), Color(0xFF2ECC71))),
-        Category(Icons.Default.Insights, "Insights", listOf(Color(0xFF2ECC71), Color(0xFF4CAF50)))
+        Category(Icons.Default.Insights, "Insights", listOf(Color(0xFF2ECC71), Color(0xFF4CAF50))),
+        Category(Icons.Default.CameraAlt, "Scan", listOf(Color(0xFF0891B2), Color(0xFF06B6D4)))
     )
 
     val recentInsights = listOf(
@@ -170,6 +171,7 @@ fun HomeScreen(
                             when (category.title) {
                                 "Add Medicine" -> "addMedicine"
                                 "Insights" -> "insights"
+                                "Scan" -> "scanner"
                                 else -> ""
                             }
                         )
