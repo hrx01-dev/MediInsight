@@ -322,27 +322,10 @@ fun ChatScreen(
                                             contentDescription = null,
                                             tint = Color(0xFF00796B),
                                             modifier = Modifier.size(20.dp)
-                                        )
+                                         )
                 Spacer(Modifier.width(8.dp))
 
-                // Voice Assistant Button
-                IconButton(
-                    onClick = { /* TODO: Navigate to VoiceAssistantScreen */ },
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = "Voice Assistant",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                Spacer(Modifier.width(8.dp))
-                                        Text(
+                // Clear Chat Button
                                             "Currently Loaded: ${availableModels.find { it.id == currentModelId }?.name ?: currentModelId}",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
@@ -647,7 +630,42 @@ fun ChatScreen(
                 )
             )
 
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
+
+            // Voice Input Button
+            IconButton(
+                onClick = { /* Placeholder: Start voice recording */ },
+                enabled = isModelVerified && !isLoading,
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (isModelVerified && !isLoading) {
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.secondary,
+                                    MaterialTheme.colorScheme.tertiary
+                                )
+                            )
+                        } else {
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            )
+                        }
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Voice Input",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(Modifier.width(8.dp))
 
             IconButton(
                 onClick = {
