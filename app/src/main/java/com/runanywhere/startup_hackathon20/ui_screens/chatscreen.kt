@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.startup_hackathon20.ChatViewModel
@@ -333,7 +334,7 @@ fun ChatScreen(
                         .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f))
                 ) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.filled.Mic,
+                        imageVector = Icons.Default.Mic,
                         contentDescription = "Voice Assistant",
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(20.dp)
