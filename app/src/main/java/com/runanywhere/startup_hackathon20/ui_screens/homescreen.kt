@@ -36,13 +36,6 @@ data class Category(
     val gradient: List<Color>
 )
 
-data class Insight(
-    val title: String,
-    val description: String,
-    val time: String,
-    val category: String = "Health"
-)
-
 @Composable
 fun HomeScreen(
     onNavigate: (String) -> Unit,

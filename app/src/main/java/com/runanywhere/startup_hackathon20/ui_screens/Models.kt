@@ -7,5 +7,6 @@ package com.runanywhere.startup_hackathon20.ui_screens
 data class Insight(
     val title: String,
     val description: String,
-    val time: String
+    val time: String,
+    val category: String = "Health"
 )
