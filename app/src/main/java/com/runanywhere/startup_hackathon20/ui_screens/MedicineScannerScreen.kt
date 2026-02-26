@@ -65,7 +65,13 @@ fun MedicineScannerScreen(
     // Initialize camera provider
     LaunchedEffect(Unit) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-        cameraProvider = cameraProviderFuture.get()
+
+        cameraProviderFuture.addListener(
+            {
+                cameraProvider = cameraProviderFuture.get()
+            },
+            ContextCompat.getMainExecutor(context)
+        )
     }
 
     // Cleanup on dispose
@@ -385,6 +391,7 @@ private fun ResultsSection(
                     }
                 }
             } else {
+
                 // Medicine Details Section
                 Text(
                     text = "Medicine Details",
@@ -394,28 +401,7 @@ private fun ResultsSection(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = detectedText,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Action Buttons
+                // ✅ Action Buttons (MOVED ABOVE)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -483,7 +469,7 @@ private fun ResultsSection(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Pause/Resume Button
+                // ✅ Pause Button (ALSO MOVED UP)
                 Button(
                     onClick = onToggleScanning,
                     modifier = Modifier.fillMaxWidth(),
@@ -498,6 +484,28 @@ private fun ResultsSection(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(if (isScanning) "Pause Scanning" else "Resume Scanning")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ✅ Detected Text Card (NOW BELOW BUTTONS)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = detectedText,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -521,13 +529,14 @@ private fun ResultsSection(
                     )
                 }
             }
-        }
+        }    // Medicine Details Section
     }
-
+}
 @Composable
-private fun PermissionRequest(
-    onRequestPermission: () -> Unit
-) {
+
+fun PermissionRequest(
+                onRequestPermission: () -> Unit
+            ) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -567,47 +576,30 @@ private fun PermissionRequest(
             }
         }
     }
+
 }
 
 @Composable
-private fun PermissionRationale(
+fun PermissionRationale(
     onRequestPermission: () -> Unit
 ) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Icon(
-                Icons.Default.Warning,
-                contentDescription = null,
-                modifier = Modifier.size(80.dp),
-                tint = Color(0xFFF59E0B)
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Camera Access Needed",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Camera permission is essential for scanning medicine labels. Without it, you won't be able to use the OCR feature.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = onRequestPermission,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Try Again")
-            }
+        Text(
+            text = "Camera permission is required to scan medicine labels.",
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onRequestPermission) {
+            Text("Grant Permission")
         }
     }
 }
+
+
+

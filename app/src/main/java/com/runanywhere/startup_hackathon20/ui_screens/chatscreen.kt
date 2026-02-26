@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -322,16 +323,16 @@ fun ChatScreen(
                                             contentDescription = null,
                                             tint = Color(0xFF00796B),
                                             modifier = Modifier.size(20.dp)
-                                         )
-                Spacer(Modifier.width(8.dp))
-
-                // Clear Chat Button
-                                            "Currently Loaded: ${availableModels.find { it.id == currentModelId }?.name ?: currentModelId}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF00796B)
                                         )
-                                    }
+                                        Spacer(Modifier.width(8.dp))
+
+                                    Text(    // Clear Chat Button
+                                        "Currently Loaded: ${availableModels.find { it.id == currentModelId }?.name ?: currentModelId}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF00796B)
+                                        )
+                                        }
                                 }
                             }
 
