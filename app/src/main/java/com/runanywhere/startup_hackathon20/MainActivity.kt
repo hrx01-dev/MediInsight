@@ -23,14 +23,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            var isDarkTheme by remember { mutableStateOf(false) }
+            var currentTheme by remember { mutableStateOf("neon") } // Default vibrant neon theme
             
-            Startup_hackathon20Theme(darkTheme = isDarkTheme) {
+            Startup_hackathon20Theme(darkTheme = false, themeMode = currentTheme) {
                 val navController = rememberNavController()
                 AppNavGraph(
                     navController = navController,
                     onThemeChange = { theme ->
-                        isDarkTheme = theme == "dark"
+                        currentTheme = theme
                     }
                 )
             }

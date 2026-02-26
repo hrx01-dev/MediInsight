@@ -1,11 +1,19 @@
 package com.runanywhere.startup_hackathon20.ui_screens
 
 import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,141 +22,63 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
-import com.google.accompanist.permissions.shouldShowRationale
-import com.runanywhere.startup_hackathon20.ChatMessage
-import com.runanywhere.startup_hackathon20.ChatViewModel
-import com.runanywhere.startup_hackathon20.voice.VoiceManager
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
+import androidx.navigation.NavHostController
+import com.runanywhere.startup_hackathon20.viewmodel.VoiceViewModel
 
-/**
- * Voice Assistant Screen
- * Combines AI chat with voice input/output capabilities
- */
-@OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VoiceAssistantScreen(
-    onBack: () -> Unit,
-    chatViewModel: ChatViewModel? = viewModel()
+    navController: NavHostController,
+    voiceViewModel: VoiceViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val voiceManager = remember { VoiceManager(context) }
-    val micPermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
-    
-    var userInput by remember { mutableStateOf("") }
-    var showModelDialog by remember { mutableStateOf(false) }
-    var voiceMode by remember { mutableStateOf(false) } // Voice input/output enabled
-    
-    // ViewModel states
-    val messages by (chatViewModel?.messages ?: remember { MutableStateFlow(emptyList()) }).collectAsState()
-    val isLoading by (chatViewModel?.isLoading ?: remember { MutableStateFlow(false) }).collectAsState()
-    val currentModelId by (chatViewModel?.currentModelId ?: remember { MutableStateFlow<String?>(null) }).collectAsState()
-    val statusMessage by (chatViewModel?.statusMessage ?: remember { MutableStateFlow("Initializing...") }).collectAsState()
-    val isModelVerified by (chatViewModel?.isModelVerified ?: remember { MutableStateFlow(false) }).collectAsState()
-    
-    // Voice states
-    val isListening by voiceManager.isListening.collectAsState()
-    val isSpeaking by voiceManager.isSpeaking.collectAsState()
-    val recognizedText by voiceManager.recognizedText.collectAsState()
-    val sttError by voiceManager.sttError.collectAsState()
-    val voiceActivityDetected by voiceManager.voiceActivityDetected.collectAsState()
-    
-    val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    
-    // Auto-scroll to bottom
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            coroutineScope.launch {
-                listState.animateScrollToItem(messages.size - 1)
-            }
-        }
-    }
-    
-    // Handle recognized text
-    LaunchedEffect(recognizedText) {
-        if (recognizedText.isNotBlank()) {
-            userInput = recognizedText
-            voiceManager.clearRecognizedText()
-        }
-    }
-    
-    // Auto-speak AI responses in voice mode
-    LaunchedEffect(messages.size, voiceMode) {
-        if (voiceMode && messages.isNotEmpty()) {
-            val lastMessage = messages.last()
-            if (!lastMessage.isUser && lastMessage.text.isNotBlank()) {
-                voiceManager.speak(lastMessage.text)
-            }
-        }
-    }
-    
-    // Cleanup on dispose
-    DisposableEffect(Unit) {
-        onDispose {
-            voiceManager.cleanup()
-        }
-    }
-    
-    // Model dialog
-    if (showModelDialog) {
-        ModelSelectionDialog(
-            chatViewModel = chatViewModel,
-            onDismiss = { showModelDialog = false }
+    val voiceState by voiceViewModel.voiceState.collectAsState()
+    val modelState by voiceViewModel.modelState.collectAsState()
+    val availableModels by voiceViewModel.availableModels.collectAsState()
+
+    var selectedTab by remember { mutableStateOf(0) }
+    val tabs = listOf("STT", "TTS", "Voice Agent", "Models")
+
+    // Permission handling
+    var hasAudioPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
         )
     }
-    
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasAudioPermission = isGranted
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasAudioPermission) {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "Voice Assistant",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            when {
-                                isListening -> "🎤 Listening..."
-                                isSpeaking -> "🔊 Speaking..."
-                                voiceActivityDetected -> "🟢 Voice detected"
-                                voiceMode -> "Voice mode active"
-                                else -> statusMessage
-                            },
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                },
+                title = { Text("Voice Assistant") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    // Voice mode toggle
-                    IconButton(
-                        onClick = { voiceMode = !voiceMode }
-                    ) {
-                        Icon(
-                            imageVector = if (voiceMode) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                            contentDescription = "Toggle voice mode",
-                            tint = if (voiceMode) Color(0xFF10B981) else Color.Gray
-                        )
-                    }
-                    
-                    // Model selection
-                    IconButton(onClick = { showModelDialog = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Model settings")
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(Icons.Default.ArrowBack, "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -162,230 +92,508 @@ fun VoiceAssistantScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // STT Error banner
-            sttError?.let { error ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFFEE2E2)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = Color(0xFFDC2626)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = error,
-                            color = Color(0xFFDC2626),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        IconButton(
-                            onClick = { voiceManager.clearSttError() },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Dismiss",
-                                tint = Color(0xFFDC2626)
-                            )
-                        }
-                    }
-                }
-            }
-            
-            // Messages list
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            // Status Card
+            StatusCard(modelState, voiceState)
+
+            // Tab Row
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                if (messages.isEmpty()) {
-                    item {
-                        EmptyStateVoice(
-                            isModelReady = isModelVerified,
-                            onShowModelDialog = { showModelDialog = true }
-                        )
-                    }
-                } else {
-                    items(messages) { message ->
-                        MessageBubble(
-                            message = message,
-                            onSpeak = {
-                                if (!message.isUser) {
-                                    voiceManager.speak(message.text)
-                                }
-                            },
-                            isSpeaking = isSpeaking
-                        )
-                    }
-                }
-                
-                if (isLoading) {
-                    item {
-                        TypingIndicator()
-                    }
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = { Text(title) }
+                    )
                 }
             }
+
+            // Tab Content
+            when (selectedTab) {
+                0 -> STTTab(voiceViewModel, voiceState, hasAudioPermission)
+                1 -> TTSTab(voiceViewModel, voiceState)
+                2 -> VoiceAgentTab(voiceViewModel, voiceState, modelState, hasAudioPermission)
+                3 -> ModelsTab(voiceViewModel, availableModels, modelState)
+            }
+        }
+    }
+}
+
+@Composable
+fun StatusCard(modelState: com.runanywhere.startup_hackathon20.viewmodel.ModelLoadingState, voiceState: com.runanywhere.startup_hackathon20.viewmodel.VoiceState) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "System Status",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             
-            // Input section
-            InputSection(
-                userInput = userInput,
-                onInputChange = { userInput = it },
-                onSend = {
-                    if (userInput.isNotBlank() && isModelVerified) {
-                        chatViewModel?.sendMessage(userInput)
-                        userInput = ""
-                    }
-                },
-                onVoiceInput = {
-                    if (micPermissionState.status.isGranted) {
-                        if (isListening) {
-                            voiceManager.stopListening()
-                        } else {
-                            voiceManager.startListening()
-                        }
-                    } else {
-                        micPermissionState.launchPermissionRequest()
-                    }
-                },
-                onStopSpeaking = { voiceManager.stopSpeaking() },
-                isLoading = isLoading,
-                isModelReady = isModelVerified,
-                isListening = isListening,
-                isSpeaking = isSpeaking
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                StatusChip("LLM", modelState.isLLMLoaded)
+                StatusChip("STT", modelState.isSTTLoaded)
+                StatusChip("TTS", modelState.isTTSLoaded)
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = voiceState.statusMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
             )
         }
     }
 }
 
 @Composable
-private fun EmptyStateVoice(
-    isModelReady: Boolean,
-    onShowModelDialog: () -> Unit
+fun StatusChip(label: String, isLoaded: Boolean) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (isLoaded) Color(0xFF4CAF50) else Color(0xFFE0E0E0),
+        modifier = Modifier.padding(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(if (isLoaded) Color.White else Color.Gray)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                color = if (isLoaded) Color.White else Color.Gray
+            )
+        }
+    }
+}
+
+@Composable
+fun STTTab(
+    viewModel: VoiceViewModel,
+    voiceState: com.runanywhere.startup_hackathon20.viewmodel.VoiceState,
+    hasPermission: Boolean
 ) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Icon(
-            imageVector = Icons.Default.Mic,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = if (isModelReady) "Voice Assistant Ready" else "Model Not Loaded",
+            text = "Speech-to-Text",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = if (isModelReady) 
-                "Tap the microphone to start speaking or type your question below"
-            else 
-                "Please load an AI model to start chatting",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (!isModelReady) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onShowModelDialog) {
-                Icon(Icons.Default.Download, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Load Model")
-            }
-        }
-    }
-}
 
-@Composable
-private fun MessageBubble(
-    message: ChatMessage,
-    onSpeak: () -> Unit,
-    isSpeaking: Boolean
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (message.isUser) Alignment.End else Alignment.Start
-    ) {
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start
+        // Audio level visualization
+        if (voiceState.isRecording) {
+            AudioLevelIndicator(voiceState.audioLevel)
+        }
+
+        // Transcribed text
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
         ) {
-            if (!message.isUser) {
-                Icon(
-                    imageVector = Icons.Default.SmartToy,
-                    contentDescription = "AI",
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = if (message.isUser)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.surfaceVariant
-                ),
-                shape = RoundedCornerShape(
-                    topStart = 16.dp,
-                    topEnd = 16.dp,
-                    bottomStart = if (message.isUser) 16.dp else 4.dp,
-                    bottomEnd = if (message.isUser) 4.dp else 16.dp
-                ),
-                modifier = Modifier.widthIn(max = 280.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Transcription:",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = voiceState.transcribedText.ifEmpty { "Start recording to see transcription..." },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (voiceState.transcribedText.isEmpty()) 
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                if (voiceState.confidence > 0f) {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = message.text,
-                        color = if (message.isUser)
-                            MaterialTheme.colorScheme.onPrimary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium
+                        text = "Confidence: ${(voiceState.confidence * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    
-                    if (!message.isUser) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        IconButton(
-                            onClick = onSpeak,
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp,
-                                contentDescription = "Speak",
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
                 }
             }
-            
-            if (message.isUser) {
+        }
+
+        // Recording button
+        if (hasPermission) {
+            if (voiceState.isRecording) {
+                Button(
+                    onClick = { viewModel.stopRecordingAndTranscribe() },
+                    modifier = Modifier
+                        .size(80.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFE53935)
+                    ),
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        Icons.Default.Stop,
+                        contentDescription = "Stop",
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+            } else {
+                Button(
+                    onClick = { viewModel.startRecording() },
+                    modifier = Modifier.size(80.dp),
+                    enabled = !voiceState.isTranscribing,
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = "Record",
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+            }
+
+            if (voiceState.isTranscribing) {
+                CircularProgressIndicator()
+            }
+
+            if (voiceState.transcribedText.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = { viewModel.clearTranscription() }
+                ) {
+                    Icon(Icons.Default.Clear, "Clear")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Clear")
+                }
+            }
+        } else {
+            Text(
+                text = "Microphone permission required",
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun TTSTab(
+    viewModel: VoiceViewModel,
+    voiceState: com.runanywhere.startup_hackathon20.viewmodel.VoiceState
+) {
+    var textToSpeak by remember { mutableStateOf("Hello! This is a test of the text-to-speech system.") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "Text-to-Speech",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+
+        OutlinedTextField(
+            value = textToSpeak,
+            onValueChange = { textToSpeak = it },
+            label = { Text("Text to speak") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp),
+            maxLines = 8,
+            enabled = !voiceState.isSpeaking
+        )
+
+        if (voiceState.isSpeaking) {
+            SpeakingAnimation()
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { viewModel.speakText(textToSpeak) },
+                modifier = Modifier.weight(1f),
+                enabled = !voiceState.isSpeaking && textToSpeak.isNotBlank()
+            ) {
+                Icon(Icons.Default.VolumeUp, "Speak")
                 Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "User",
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                Text("Speak")
+            }
+
+            if (voiceState.isSpeaking) {
+                OutlinedButton(
+                    onClick = { viewModel.stopSpeaking() },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Stop, "Stop")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Stop")
+                }
+            }
+        }
+
+        // Quick test phrases
+        Text(
+            text = "Quick Test Phrases:",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.align(Alignment.Start)
+        )
+
+        val testPhrases = listOf(
+            "Hello, how are you today?",
+            "The quick brown fox jumps over the lazy dog.",
+            "Testing text-to-speech functionality.",
+            "Welcome to the voice assistant demo."
+        )
+
+        testPhrases.forEach { phrase ->
+            OutlinedButton(
+                onClick = { textToSpeak = phrase },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(phrase, maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+fun VoiceAgentTab(
+    viewModel: VoiceViewModel,
+    voiceState: com.runanywhere.startup_hackathon20.viewmodel.VoiceState,
+    modelState: com.runanywhere.startup_hackathon20.viewmodel.ModelLoadingState,
+    hasPermission: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "Full Voice Agent",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            text = "Complete pipeline: VAD → STT → LLM → TTS",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center
+        )
+
+        // Pipeline status
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Pipeline Status",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                PipelineStep("VAD", "Voice Detection", true)
+                PipelineStep("STT", "Speech Recognition", modelState.isSTTLoaded)
+                PipelineStep("LLM", "AI Processing", modelState.isLLMLoaded)
+                PipelineStep("TTS", "Speech Synthesis", modelState.isTTSLoaded)
+            }
+        }
+
+        // Conversation display
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Conversation:",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                if (voiceState.transcribedText.isNotEmpty()) {
+                    Text(
+                        text = "You: ${voiceState.transcribedText}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+                
+                if (voiceState.responseText.isNotEmpty()) {
+                    Text(
+                        text = "AI: ${voiceState.responseText}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+
+                if (voiceState.transcribedText.isEmpty() && voiceState.responseText.isEmpty()) {
+                    Text(
+                        text = "Start the voice agent to begin conversation...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        }
+
+        val allModelsLoaded = modelState.isLLMLoaded && 
+                             modelState.isSTTLoaded && 
+                             modelState.isTTSLoaded
+
+        if (!allModelsLoaded) {
+            Text(
+                text = "Please load all models (LLM, STT, TTS) in the Models tab first",
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+
+        // Control buttons
+        if (hasPermission) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { viewModel.startVoiceAgent() },
+                    modifier = Modifier.weight(1f),
+                    enabled = allModelsLoaded && !voiceState.isProcessing
+                ) {
+                    Icon(Icons.Default.PlayArrow, "Start")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Start Agent")
+                }
+
+                OutlinedButton(
+                    onClick = { viewModel.stopVoiceAgent() },
+                    modifier = Modifier.weight(1f),
+                    enabled = voiceState.isProcessing
+                ) {
+                    Icon(Icons.Default.Stop, "Stop")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Stop")
+                }
+            }
+        } else {
+            Text(
+                text = "Microphone permission required",
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun ModelsTab(
+    viewModel: VoiceViewModel,
+    availableModels: List<com.runanywhere.sdk.models.ModelInfo>,
+    modelState: com.runanywhere.startup_hackathon20.viewmodel.ModelLoadingState
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Model Management",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        if (modelState.downloadProgress != null) {
+            LinearProgressIndicator(
+                progress = { modelState.downloadProgress },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                text = "Downloading: ${(modelState.downloadProgress * 100).toInt()}%",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+        }
+
+        Button(
+            onClick = { viewModel.refreshModels() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Refresh, "Refresh")
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Refresh Models")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(availableModels) { model ->
+                ModelCard(
+                    model = model,
+                    viewModel = viewModel,
+                    modelState = modelState
                 )
             }
         }
@@ -393,100 +601,63 @@ private fun MessageBubble(
 }
 
 @Composable
-private fun InputSection(
-    userInput: String,
-    onInputChange: (String) -> Unit,
-    onSend: () -> Unit,
-    onVoiceInput: () -> Unit,
-    onStopSpeaking: () -> Unit,
-    isLoading: Boolean,
-    isModelReady: Boolean,
-    isListening: Boolean,
-    isSpeaking: Boolean
+fun ModelCard(
+    model: com.runanywhere.sdk.models.ModelInfo,
+    viewModel: VoiceViewModel,
+    modelState: com.runanywhere.startup_hackathon20.viewmodel.ModelLoadingState
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(12.dp)
         ) {
-            // Voice input button
-            IconButton(
-                onClick = onVoiceInput,
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = when {
-                            isListening -> Color(0xFFEF4444)
-                            !isModelReady -> Color.Gray
-                            else -> MaterialTheme.colorScheme.primary
-                        },
-                        shape = CircleShape
-                    )
-            ) {
-                Icon(
-                    imageVector = if (isListening) Icons.Default.Stop else Icons.Default.Mic,
-                    contentDescription = if (isListening) "Stop listening" else "Voice input",
-                    tint = Color.White
-                )
-            }
-            
-            // Text input
-            OutlinedTextField(
-                value = userInput,
-                onValueChange = onInputChange,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text(if (isListening) "Listening..." else "Type or speak...") },
-                enabled = !isLoading && isModelReady && !isListening,
-                shape = RoundedCornerShape(24.dp),
-                maxLines = 3
+            Text(
+                text = model.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Model: ${model.id}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            // Send button
-            IconButton(
-                onClick = onSend,
-                enabled = userInput.isNotBlank() && !isLoading && isModelReady,
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = if (userInput.isNotBlank() && isModelReady)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            Color.Gray,
-                        shape = CircleShape
-                    )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Send,
-                    contentDescription = "Send",
-                    tint = Color.White
-                )
-            }
-            
-            // Stop speaking button (if speaking)
-            if (isSpeaking) {
-                IconButton(
-                    onClick = onStopSpeaking,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            color = Color(0xFFEF4444),
-                            shape = CircleShape
+                if (model.isDownloaded) {
+                    Button(
+                        onClick = {
+                            // Placeholder: Load model functionality
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = true
+                    ) {
+                        Icon(
+                            Icons.Default.Check,
+                            "Load"
                         )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.VolumeOff,
-                        contentDescription = "Stop speaking",
-                        tint = Color.White
-                    )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Loaded")
+                    }
+                } else {
+                    Button(
+                        onClick = { /* Placeholder: Download functionality */ },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Download, "Download")
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Download")
+                    }
                 }
             }
         }
@@ -494,59 +665,97 @@ private fun InputSection(
 }
 
 @Composable
-private fun TypingIndicator() {
+fun PipelineStep(icon: String, label: String, isReady: Boolean) {
     Row(
         modifier = Modifier
-            .padding(16.dp),
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Default.SmartToy,
-            contentDescription = "AI",
-            modifier = Modifier.size(32.dp),
-            tint = MaterialTheme.colorScheme.primary
+            imageVector = when (icon) {
+                "VAD" -> Icons.Default.Mic
+                "STT" -> Icons.Default.Mic
+                "LLM" -> Icons.Default.Psychology
+                "TTS" -> Icons.Default.VolumeUp
+                else -> Icons.Default.Circle
+            },
+            contentDescription = icon,
+            tint = if (isReady) Color(0xFF4CAF50) else Color.Gray
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                repeat(3) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(
-                                MaterialTheme.colorScheme.onSurfaceVariant,
-                                CircleShape
-                            )
-                    )
-                }
-            }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (isReady) MaterialTheme.colorScheme.onTertiaryContainer
+                   else MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.5f)
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        if (isReady) {
+            Icon(
+                Icons.Default.CheckCircle,
+                "Ready",
+                tint = Color(0xFF4CAF50),
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
 
 @Composable
-private fun ModelSelectionDialog(
-    chatViewModel: ChatViewModel?,
-    onDismiss: () -> Unit
-) {
-    // Use the existing model selection from ChatScreen
-    // This is a placeholder - you can reuse the ModelSelectionDialog from ChatScreen
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Model Settings") },
-        text = { Text("Model selection dialog - integrate with ChatViewModel") },
-        confirmButton = {
-            Button(onClick = onDismiss) {
-                Text("Close")
-            }
-        }
+fun AudioLevelIndicator(level: Float) {
+    val scale = 1f + (level * 0.5f)
+    
+    Box(
+        modifier = Modifier
+            .size(100.dp)
+            .scale(scale)
+            .clip(CircleShape)
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFFE53935).copy(alpha = 0.8f),
+                        Color(0xFFE53935).copy(alpha = 0.3f)
+                    )
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            Icons.Default.Mic,
+            "Recording",
+            tint = Color.White,
+            modifier = Modifier.size(40.dp)
+        )
+    }
+}
+
+@Composable
+fun SpeakingAnimation() {
+    val infiniteTransition = rememberInfiniteTransition(label = "speaking")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
     )
+
+    Box(
+        modifier = Modifier
+            .size(80.dp)
+            .scale(scale)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            Icons.Default.VolumeUp,
+            "Speaking",
+            tint = Color.White,
+            modifier = Modifier.size(40.dp)
+        )
+    }
 }

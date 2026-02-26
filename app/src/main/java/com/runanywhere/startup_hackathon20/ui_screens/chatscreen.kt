@@ -1,5 +1,10 @@
 package com.runanywhere.startup_hackathon20.ui_screens
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -9,17 +14,21 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.startup_hackathon20.ChatViewModel
 import com.runanywhere.startup_hackathon20.ChatMessage
@@ -27,6 +36,7 @@ import com.runanywhere.startup_hackathon20.R
 import com.runanywhere.startup_hackathon20.ui.theme.Startup_hackathon20Theme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 data class Message(
     val text: String,
@@ -40,6 +50,20 @@ fun ChatScreen(
 ) {
     var inputText by remember { mutableStateOf(TextFieldValue("")) }
     var showModelDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // Voice input launcher
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            spokenText?.firstOrNull()?.let { text ->
+                // Set the recognized text to the input field
+                inputText = TextFieldValue(text)
+            }
+        }
+    }
 
     // Collect messages from ViewModel
     val messages by (viewModel?.messages ?: MutableStateFlow(emptyList())).collectAsState()
@@ -322,13 +346,14 @@ fun ChatScreen(
                                             modifier = Modifier.size(20.dp)
                                         )
                                         Spacer(Modifier.width(8.dp))
-                                        Text(
-                                            "Currently Loaded: ${availableModels.find { it.id == currentModelId }?.name ?: currentModelId}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF00796B)
+
+                                    Text(    // Clear Chat Button
+                                        "Currently Loaded: ${availableModels.find { it.id == currentModelId }?.name ?: currentModelId}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF00796B)
                                         )
-                                    }
+                                        }
                                 }
                             }
 
@@ -627,7 +652,50 @@ fun ChatScreen(
                 )
             )
 
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
+
+            // Voice Input Button
+            IconButton(
+                onClick = {
+                    // Start voice recognition
+                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                    }
+                    speechRecognizerLauncher.launch(intent)
+                },
+                enabled = isModelVerified && !isLoading,
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (isModelVerified && !isLoading) {
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.secondary,
+                                    MaterialTheme.colorScheme.tertiary
+                                )
+                            )
+                        } else {
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            )
+                        }
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Voice Input",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(Modifier.width(8.dp))
 
             IconButton(
                 onClick = {

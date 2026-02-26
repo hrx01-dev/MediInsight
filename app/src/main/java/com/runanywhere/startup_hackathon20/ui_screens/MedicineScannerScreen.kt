@@ -65,7 +65,13 @@ fun MedicineScannerScreen(
     // Initialize camera provider
     LaunchedEffect(Unit) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-        cameraProvider = cameraProviderFuture.get()
+
+        cameraProviderFuture.addListener(
+            {
+                cameraProvider = cameraProviderFuture.get()
+            },
+            ContextCompat.getMainExecutor(context)
+        )
     }
 
     // Cleanup on dispose
@@ -333,48 +339,6 @@ private fun ResultsSection(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            // Control buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                FilledIconButton(
-                    onClick = onToggleScanning,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = if (isScanning) Color(0xFFEF4444) else Color(0xFF34D399)
-                    ),
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isScanning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isScanning) "Pause" else "Resume"
-                    )
-                }
-
-                FilledIconButton(
-                    onClick = onClearHistory,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    ),
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(Icons.Default.Clear, contentDescription = "Clear")
-                }
-
-                FilledIconButton(
-                    onClick = onUseCapturedText,
-                    enabled = detectedText.isNotBlank(),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = Color(0xFF3B82F6)
-                    ),
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = "Use Text")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
             // Error display
             if (error != null) {
                 Card(
@@ -404,48 +368,136 @@ private fun ResultsSection(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Detected text section
-            Text(
-                text = "Detected Text:",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            if (detectedText.isBlank()) {
+                // Empty state
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.CameraAlt,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Point camera at medicine label",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                // Medicine Details Section
+                Text(
+                    text = "Medicine Details",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
-            ) {
-                if (detectedText.isBlank()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ✅ Action Buttons (MOVED ABOVE)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Ask AI Button
+                    Button(
+                        onClick = onUseCapturedText,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF8B5CF6)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
                             Icon(
-                                Icons.Default.CameraAlt,
+                                Icons.Default.Psychology,
                                 contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                modifier = Modifier.size(20.dp),
+                                tint = Color.White
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Point camera at medicine label",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                textAlign = TextAlign.Center
+                                "Ask AI",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
                             )
                         }
                     }
-                } else {
+
+                    // Add to Insights Button
+                    Button(
+                        onClick = onClearHistory,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF06B6D4)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = Color.White
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                "Add to Insights",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ✅ Pause Button (ALSO MOVED UP)
+                Button(
+                    onClick = onToggleScanning,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isScanning) Color(0xFFEF4444) else Color(0xFF34D399)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isScanning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (isScanning) "Pause Scanning" else "Resume Scanning")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ✅ Detected Text Card (NOW BELOW BUTTONS)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
                     Column(
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
                             .padding(16.dp)
                     ) {
@@ -455,36 +507,36 @@ private fun ResultsSection(
                         )
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // Instructions
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.Info,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Tap ✓ to use this text for adding medicine",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // Instructions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Choose an action or continue scanning",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-        }
+        }    // Medicine Details Section
     }
 }
-
 @Composable
-private fun PermissionRequest(
-    onRequestPermission: () -> Unit
-) {
+
+fun PermissionRequest(
+                onRequestPermission: () -> Unit
+            ) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -524,47 +576,30 @@ private fun PermissionRequest(
             }
         }
     }
+
 }
 
 @Composable
-private fun PermissionRationale(
+fun PermissionRationale(
     onRequestPermission: () -> Unit
 ) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Icon(
-                Icons.Default.Warning,
-                contentDescription = null,
-                modifier = Modifier.size(80.dp),
-                tint = Color(0xFFF59E0B)
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Camera Access Needed",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Camera permission is essential for scanning medicine labels. Without it, you won't be able to use the OCR feature.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = onRequestPermission,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Try Again")
-            }
+        Text(
+            text = "Camera permission is required to scan medicine labels.",
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onRequestPermission) {
+            Text("Grant Permission")
         }
     }
 }
+
+
+
