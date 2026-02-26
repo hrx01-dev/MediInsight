@@ -12,6 +12,8 @@ import com.runanywhere.startup_hackathon20.ui_screens.AuthScreen
 import com.runanywhere.startup_hackathon20.ui_screens.ChatScreen
 import com.runanywhere.startup_hackathon20.ui_screens.HomeScreen
 import com.runanywhere.startup_hackathon20.ui_screens.InsightsScreen
+import com.runanywhere.startup_hackathon20.ui_screens.MedicineAnalysisResultsScreen
+import com.runanywhere.startup_hackathon20.ui_screens.MedicineAnalysisScreen
 import com.runanywhere.startup_hackathon20.ui_screens.MedicineScannerScreen
 import com.runanywhere.startup_hackathon20.ui_screens.NotificationsScreen
 import com.runanywhere.startup_hackathon20.ui_screens.OnboardingScreens
@@ -70,6 +72,7 @@ fun AppNavGraph(
                         "insights" -> navController.navigate(Routes.MedicalInsights)
                         "addMedicine" -> navController.navigate(Routes.AddMedicines)
                         "scanner" -> navController.navigate(Routes.MedicineScanner)
+                        "analysis" -> navController.navigate(Routes.MedicineAnalysis)
                         "settings" -> navController.navigate(Routes.Settings)
                         "notifications" -> navController.navigate(Routes.Notification)
                         "chat" -> navController.navigate(Routes.Chat)
@@ -155,6 +158,16 @@ fun AppNavGraph(
                     navController.popBackStack()
                 }
             )
+        }
+
+        // Medicine Analysis Screen (OCR to AI Analysis Pipeline)
+        composable(route = Routes.MedicineAnalysis) {
+            MedicineAnalysisScreen(navController = navController)
+        }
+
+        // Medicine Analysis Results Screen
+        composable(route = Routes.MedicineAnalysisResults) {
+            MedicineAnalysisResultsScreen(navController = navController)
         }
     }
 }
