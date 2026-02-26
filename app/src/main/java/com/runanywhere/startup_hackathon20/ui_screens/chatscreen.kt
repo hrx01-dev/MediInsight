@@ -1,5 +1,10 @@
 package com.runanywhere.startup_hackathon20.ui_screens
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -16,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -30,6 +36,7 @@ import com.runanywhere.startup_hackathon20.R
 import com.runanywhere.startup_hackathon20.ui.theme.Startup_hackathon20Theme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 data class Message(
     val text: String,
@@ -43,6 +50,20 @@ fun ChatScreen(
 ) {
     var inputText by remember { mutableStateOf(TextFieldValue("")) }
     var showModelDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // Voice input launcher
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            spokenText?.firstOrNull()?.let { text ->
+                // Set the recognized text to the input field
+                inputText = TextFieldValue(text)
+            }
+        }
+    }
 
     // Collect messages from ViewModel
     val messages by (viewModel?.messages ?: MutableStateFlow(emptyList())).collectAsState()
@@ -635,7 +656,15 @@ fun ChatScreen(
 
             // Voice Input Button
             IconButton(
-                onClick = { /* Placeholder: Start voice recording */ },
+                onClick = {
+                    // Start voice recognition
+                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                    }
+                    speechRecognizerLauncher.launch(intent)
+                },
                 enabled = isModelVerified && !isLoading,
                 modifier = Modifier
                     .size(50.dp)
