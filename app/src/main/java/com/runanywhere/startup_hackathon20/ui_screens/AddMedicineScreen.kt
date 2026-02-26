@@ -3,14 +3,18 @@ package com.runanywhere.startup_hackathon20.ui_screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -186,26 +190,45 @@ fun AddMedicineScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // TOP BAR
+        // TOP BAR with gradient
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primary)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(Color(0xFF10B981), Color(0xFF34D399))
+                    )
+                )
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.2f))
+            ) {
                 Icon(
                     Icons.Default.ArrowBack,
                     contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onPrimary
+                    tint = Color.White
                 )
             }
-            Text(
-                "Add Medicine",
-                color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.titleLarge
-            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    "Add Medicine",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Store securely on device",
+                    color = Color.White.copy(alpha = 0.9f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
 
         // Error message
@@ -353,177 +376,310 @@ fun AddMedicineScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Form fields
+                    // Form fields with creative styling
+                    // Medicine Name Field
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
                         label = { Text("Medicine Name *") },
+                        placeholder = { Text("e.g., Paracetamol") },
                         leadingIcon = {
-                            Icon(Icons.Default.MedicalServices, contentDescription = null)
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(Color(0xFF10B981), Color(0xFF34D399))
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Medication,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF34D399),
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                            focusedLabelColor = Color(0xFF34D399),
-                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedLeadingIconColor = Color(0xFF34D399),
-                            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedBorderColor = Color(0xFF10B981),
+                            unfocusedBorderColor = Color(0xFFE5E7EB),
+                            focusedLabelColor = Color(0xFF10B981),
+                            unfocusedLabelColor = Color(0xFF6B7280),
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedPlaceholderColor = Color(0xFF9CA3AF),
+                            unfocusedPlaceholderColor = Color(0xFF9CA3AF)
                         )
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Dosage Field
                     OutlinedTextField(
                         value = dosage,
                         onValueChange = { dosage = it },
                         label = { Text("Dosage (e.g., 500mg) *") },
+                        placeholder = { Text("e.g., 500mg, 1 tablet") },
                         leadingIcon = {
-                            Icon(Icons.Default.LocalPharmacy, contentDescription = null)
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(Color(0xFF3B82F6), Color(0xFF60A5FA))
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Vaccines,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF34D399),
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                            focusedLabelColor = Color(0xFF34D399),
-                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedLeadingIconColor = Color(0xFF34D399),
-                            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedBorderColor = Color(0xFF3B82F6),
+                            unfocusedBorderColor = Color(0xFFE5E7EB),
+                            focusedLabelColor = Color(0xFF3B82F6),
+                            unfocusedLabelColor = Color(0xFF6B7280),
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedPlaceholderColor = Color(0xFF9CA3AF),
+                            unfocusedPlaceholderColor = Color(0xFF9CA3AF)
                         )
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Frequency Field
                     OutlinedTextField(
                         value = frequency,
                         onValueChange = { frequency = it },
                         label = { Text("Frequency (e.g., 3 times a day) *") },
+                        placeholder = { Text("e.g., 3 times a day") },
                         leadingIcon = {
-                            Icon(Icons.Default.Schedule, contentDescription = null)
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(Color(0xFFF59E0B), Color(0xFFFBBF24))
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Notifications,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF34D399),
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                            focusedLabelColor = Color(0xFF34D399),
-                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedLeadingIconColor = Color(0xFF34D399),
-                            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedBorderColor = Color(0xFFF59E0B),
+                            unfocusedBorderColor = Color(0xFFE5E7EB),
+                            focusedLabelColor = Color(0xFFF59E0B),
+                            unfocusedLabelColor = Color(0xFF6B7280),
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedPlaceholderColor = Color(0xFF9CA3AF),
+                            unfocusedPlaceholderColor = Color(0xFF9CA3AF)
                         )
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Time Field
                     OutlinedTextField(
                         value = time,
                         onValueChange = { time = it },
                         label = { Text("Time (e.g., After meals) *") },
+                        placeholder = { Text("e.g., After meals, Morning") },
                         leadingIcon = {
-                            Icon(Icons.Default.AccessTime, contentDescription = null)
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(Color(0xFF8B5CF6), Color(0xFFA78BFA))
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Alarm,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF34D399),
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                            focusedLabelColor = Color(0xFF34D399),
-                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedLeadingIconColor = Color(0xFF34D399),
-                            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedBorderColor = Color(0xFF8B5CF6),
+                            unfocusedBorderColor = Color(0xFFE5E7EB),
+                            focusedLabelColor = Color(0xFF8B5CF6),
+                            unfocusedLabelColor = Color(0xFF6B7280),
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedPlaceholderColor = Color(0xFF9CA3AF),
+                            unfocusedPlaceholderColor = Color(0xFF9CA3AF)
                         )
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Duration Field
                     OutlinedTextField(
                         value = duration,
                         onValueChange = { duration = it },
                         label = { Text("Duration (e.g., 7 days) *") },
+                        placeholder = { Text("e.g., 7 days, 2 weeks") },
                         leadingIcon = {
-                            Icon(Icons.Default.CalendarToday, contentDescription = null)
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(Color(0xFFEC4899), Color(0xFFF472B6))
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF34D399),
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                            focusedLabelColor = Color(0xFF34D399),
-                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedLeadingIconColor = Color(0xFF34D399),
-                            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedBorderColor = Color(0xFFEC4899),
+                            unfocusedBorderColor = Color(0xFFE5E7EB),
+                            focusedLabelColor = Color(0xFFEC4899),
+                            unfocusedLabelColor = Color(0xFF6B7280),
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedPlaceholderColor = Color(0xFF9CA3AF),
+                            unfocusedPlaceholderColor = Color(0xFF9CA3AF)
                         )
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Quantity Field
                     OutlinedTextField(
                         value = quantity,
                         onValueChange = { quantity = it },
                         label = { Text("Quantity (e.g., 21 tablets) *") },
+                        placeholder = { Text("e.g., 21 tablets, 100ml") },
                         leadingIcon = {
-                            Icon(Icons.Default.Tag, contentDescription = null)
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(Color(0xFF06B6D4), Color(0xFF22D3EE))
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Inventory,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF34D399),
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                            focusedLabelColor = Color(0xFF34D399),
-                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedLeadingIconColor = Color(0xFF34D399),
-                            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedBorderColor = Color(0xFF06B6D4),
+                            unfocusedBorderColor = Color(0xFFE5E7EB),
+                            focusedLabelColor = Color(0xFF06B6D4),
+                            unfocusedLabelColor = Color(0xFF6B7280),
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedPlaceholderColor = Color(0xFF9CA3AF),
+                            unfocusedPlaceholderColor = Color(0xFF9CA3AF)
                         )
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Instructions Field
                     OutlinedTextField(
                         value = instructions,
                         onValueChange = { instructions = it },
                         label = { Text("Instructions *") },
+                        placeholder = { Text("e.g., Take with water, Avoid alcohol") },
                         leadingIcon = {
-                            Icon(Icons.Default.Description, contentDescription = null)
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(Color(0xFFEF4444), Color(0xFFF87171))
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.NoteAlt,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 3,
                         maxLines = 5,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF34D399),
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                            focusedLabelColor = Color(0xFF34D399),
-                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedLeadingIconColor = Color(0xFF34D399),
-                            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedBorderColor = Color(0xFFEF4444),
+                            unfocusedBorderColor = Color(0xFFE5E7EB),
+                            focusedLabelColor = Color(0xFFEF4444),
+                            unfocusedLabelColor = Color(0xFF6B7280),
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedPlaceholderColor = Color(0xFF9CA3AF),
+                            unfocusedPlaceholderColor = Color(0xFF9CA3AF)
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(28.dp))
 
-                    // Add button
+                    // Add button with gradient
                     Button(
                         onClick = {
                             if (name.isNotBlank() && dosage.isNotBlank() &&
@@ -545,33 +701,53 @@ fun AddMedicineScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp),
+                            .height(60.dp),
                         enabled = !isLoading && name.isNotBlank() && dosage.isNotBlank() &&
                                 frequency.isNotBlank() && time.isNotBlank() &&
                                 duration.isNotBlank() && quantity.isNotBlank() &&
                                 instructions.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF34D399),
+                            containerColor = Color.Transparent,
                             disabledContainerColor = Color(0xFFD1D5DB)
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                "Add Medicine",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(Color(0xFF10B981), Color(0xFF34D399))
+                                    ),
+                                    RoundedCornerShape(16.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            } else {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AddCircle,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        "Add Medicine",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
                         }
                     }
 
