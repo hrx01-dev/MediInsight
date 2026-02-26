@@ -328,7 +328,6 @@ fun getCategoryColor(category: String): Color {
         "Safety" -> Color(0xFFEF4444)
         else -> Color(0xFF6B7280)
     }
-    }
 }
 
 @Composable
