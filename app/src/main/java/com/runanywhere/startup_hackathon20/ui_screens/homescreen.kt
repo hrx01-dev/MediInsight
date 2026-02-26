@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,23 +36,25 @@ data class Category(
     val gradient: List<Color>
 )
 
+data class Insight(
+    val title: String,
+    val description: String,
+    val time: String,
+    val category: String = "Health"
+)
+
 @Composable
 fun HomeScreen(
     onNavigate: (String) -> Unit,
     viewModel: HomeViewModel? = viewModel()
 ) {
     val userName by (viewModel?.userName ?: MutableStateFlow("User")).collectAsState()
+    val recentInsights by (viewModel?.recentInsights ?: MutableStateFlow(emptyList())).collectAsState()
 
     val categories = listOf(
         Category(Icons.Default.Add, "Add Medicine", listOf(Color(0xFF4CAF50), Color(0xFF2ECC71))),
         Category(Icons.Default.Insights, "Insights", listOf(Color(0xFF2ECC71), Color(0xFF4CAF50))),
         Category(Icons.Default.CameraAlt, "Scan", listOf(Color(0xFF0891B2), Color(0xFF06B6D4)))
-    )
-
-    val recentInsights = listOf(
-        Insight("Productivity Boost", "Learn 5 tips to increase daily productivity", "2 hours ago"),
-        Insight("Better Sleep", "Expert advice for improving sleep quality", "5 hours ago"),
-        Insight("Healthy Habits", "Building sustainable daily routines", "1 day ago")
     )
 
     LazyColumn(
@@ -182,43 +185,149 @@ fun HomeScreen(
 
         // 📝 Recent Insights
         item {
-            Text(
-                "Recent Insights",
-                modifier = Modifier.padding(24.dp),
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Recent Insights",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                if (recentInsights.isNotEmpty()) {
+                    Text(
+                        "Based on your queries",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        if (recentInsights.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Chat,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "No insights yet",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "Start asking questions in the chat to see personalized health insights here",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
         }
 
         items(recentInsights) { insight ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 6.dp),
+                    .padding(horizontal = 24.dp, vertical = 6.dp)
+                    .clickable { onNavigate("chat") },
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        insight.title,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        insight.description,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            insight.title,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        // Category badge
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = getCategoryColor(insight.category)
+                        ) {
+                            Text(
+                                insight.category,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        insight.time,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        fontSize = 12.sp
+                        insight.description,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium
                     )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            insight.time,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            fontSize = 12.sp
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = "View details",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun getCategoryColor(category: String): Color {
+    return when (category) {
+        "Medication" -> Color(0xFF3B82F6)
+        "Chronic Care" -> Color(0xFFEC4899)
+        "Allergies" -> Color(0xFFF59E0B)
+        "Common Illness" -> Color(0xFF10B981)
+        "Nutrition" -> Color(0xFF8B5CF6)
+        "Wellness" -> Color(0xFF06B6D4)
+        "Pain Management" -> Color(0xFFEF4444)
+        "Digestive" -> Color(0xFF14B8A6)
+        "General Health" -> Color(0xFF6366F1)
+        "Best Practice" -> Color(0xFF10B981)
+        "Safety" -> Color(0xFFEF4444)
+        else -> Color(0xFF6B7280)
+    }
     }
 }
 
