@@ -204,14 +204,30 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                     statusMessage = "Loading STT model..."
                 )
                 
-                // Placeholder: RunAnywhere.loadSTTModel(modelId) - not available
-                kotlinx.coroutines.delay(500)
+                // Unload existing model first
+                try {
+                    RunAnywhere.unloadModel()
+                    kotlinx.coroutines.delay(300)
+                } catch (e: Exception) {
+                    Log.d(TAG, "No previous model loaded")
+                }
                 
-                _modelState.value = _modelState.value.copy(
-                    sttModelId = modelId,
-                    isSTTLoaded = true,
-                    statusMessage = "STT model loaded successfully"
-                )
+                // Load STT model using RunAnywhere
+                val success = RunAnywhere.loadModel(modelId)
+                if (success) {
+                    kotlinx.coroutines.delay(500)
+                    _modelState.value = _modelState.value.copy(
+                        sttModelId = modelId,
+                        isSTTLoaded = true,
+                        statusMessage = "STT model loaded successfully"
+                    )
+                    Log.d(TAG, "STT model loaded: $modelId")
+                } else {
+                    _modelState.value = _modelState.value.copy(
+                        statusMessage = "Failed to load STT model"
+                    )
+                    Log.e(TAG, "Failed to load STT model: $modelId")
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading STT: ${e.message}")
                 _modelState.value = _modelState.value.copy(
@@ -255,8 +271,10 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 if (!_modelState.value.isSTTLoaded) {
                     _voiceState.value = _voiceState.value.copy(
-                        statusMessage = "Please load an STT model first"
+                        statusMessage = "STT model not loaded. Please load a model first.",
+                        isRecording = false
                     )
+                    Log.w(TAG, "Cannot start recording: STT model not loaded")
                     return@launch
                 }
 
@@ -269,28 +287,40 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                     audioFormat,
                     bufferSize * 2
                 ).apply {
-                    startRecording()
+                    if (state == AudioRecord.STATE_INITIALIZED) {
+                        startRecording()
+                    } else {
+                        throw Exception("Failed to initialize AudioRecord")
+                    }
                 }
 
                 _voiceState.value = _voiceState.value.copy(
                     isRecording = true,
+                    audioLevel = 0f,
                     statusMessage = "Recording... Speak now"
                 )
+                
+                Log.d(TAG, "Recording started")
 
                 // Read audio in background
                 viewModelScope.launch(Dispatchers.IO) {
                     val buffer = ByteArray(bufferSize)
                     
-                    while (_voiceState.value.isRecording) {
-                        val read = audioRecorder?.read(buffer, 0, buffer.size) ?: 0
-                        if (read > 0) {
-                            audioBuffer.addAll(buffer.take(read))
-                            
-                            // Calculate audio level for visualization
-                            val level = calculateAudioLevel(buffer, read)
-                            withContext(Dispatchers.Main) {
-                                _voiceState.value = _voiceState.value.copy(audioLevel = level)
+                    while (_voiceState.value.isRecording && audioRecorder?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                        try {
+                            val read = audioRecorder?.read(buffer, 0, buffer.size) ?: 0
+                            if (read > 0) {
+                                audioBuffer.addAll(buffer.take(read))
+                                
+                                // Calculate audio level for visualization
+                                val level = calculateAudioLevel(buffer, read)
+                                withContext(Dispatchers.Main) {
+                                    _voiceState.value = _voiceState.value.copy(audioLevel = level)
+                                }
                             }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error reading audio: ${e.message}")
+                            break
                         }
                     }
                 }
@@ -298,7 +328,7 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                 Log.e(TAG, "Error starting recording: ${e.message}")
                 _voiceState.value = _voiceState.value.copy(
                     isRecording = false,
-                    statusMessage = "Error starting recording: ${e.message}"
+                    statusMessage = "Error: ${e.message}"
                 )
             }
         }
@@ -310,40 +340,66 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
     fun stopRecordingAndTranscribe() {
         viewModelScope.launch {
             try {
+                // Stop recording
                 _voiceState.value = _voiceState.value.copy(
                     isRecording = false,
                     isTranscribing = true,
-                    statusMessage = "Transcribing..."
+                    statusMessage = "Processing audio...",
+                    audioLevel = 0f
                 )
 
                 audioRecorder?.stop()
                 audioRecorder?.release()
                 audioRecorder = null
+                
+                Log.d(TAG, "Recording stopped. Audio buffer size: ${audioBuffer.size}")
 
                 if (audioBuffer.isEmpty()) {
                     _voiceState.value = _voiceState.value.copy(
                         isTranscribing = false,
-                        statusMessage = "No audio recorded"
+                        statusMessage = "No audio recorded. Try again.",
+                        transcribedText = ""
                     )
+                    Log.w(TAG, "Audio buffer is empty")
                     return@launch
                 }
 
+                // Transcribe the audio
                 val audioData = audioBuffer.toByteArray()
-                val transcription = RunAnywhere.transcribe(audioData)
+                Log.d(TAG, "Starting transcription with ${audioData.size} bytes")
                 
-                _voiceState.value = _voiceState.value.copy(
-                    isTranscribing = false,
-                    transcribedText = transcription,
-                    statusMessage = "Transcription complete",
-                    confidence = 0.95f // Placeholder
-                )
+                val transcription = try {
+                    RunAnywhere.transcribe(audioData)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Transcription error: ${e.message}")
+                    throw e
+                }
+                
+                if (transcription.isBlank()) {
+                    _voiceState.value = _voiceState.value.copy(
+                        isTranscribing = false,
+                        statusMessage = "No speech detected. Try again.",
+                        transcribedText = ""
+                    )
+                    Log.w(TAG, "Transcription result was blank")
+                } else {
+                    _voiceState.value = _voiceState.value.copy(
+                        isTranscribing = false,
+                        transcribedText = transcription,
+                        statusMessage = "Transcription complete",
+                        confidence = 0.95f
+                    )
+                    Log.d(TAG, "Transcription successful: $transcription")
+                }
 
                 audioBuffer.clear()
             } catch (e: Exception) {
-                Log.e(TAG, "Error transcribing: ${e.message}")
+                Log.e(TAG, "Error in stopRecordingAndTranscribe: ${e.message}", e)
                 _voiceState.value = _voiceState.value.copy(
+                    isRecording = false,
                     isTranscribing = false,
-                    statusMessage = "Error transcribing: ${e.message}"
+                    statusMessage = "Error: ${e.message}",
+                    transcribedText = ""
                 )
             }
         }

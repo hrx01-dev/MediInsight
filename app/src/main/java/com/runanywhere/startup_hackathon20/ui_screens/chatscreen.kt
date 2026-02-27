@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Warning
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.startup_hackathon20.ChatViewModel
 import com.runanywhere.startup_hackathon20.ChatMessage
@@ -705,6 +706,42 @@ fun ChatScreen(
                     }
                 }
             }
+            
+            // STT model status warning
+            if (!voiceState.isRecording && !voiceState.isTranscribing && !modelState.isSTTLoaded) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFEF3C7)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = Color(0xFFF59E0B),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Load an STT model to use voice input",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF92400E)
+                        )
+                    }
+                }
+            }
+                    }
+                }
+            }
 
             Row(
                 modifier = Modifier
@@ -743,39 +780,42 @@ fun ChatScreen(
                             // Check if STT model is loaded
                             if (!modelState.isSTTLoaded) {
                                 // Show message to load STT model first
-                                // You might want to add a Snackbar or Toast here
                                 return@IconButton
                             }
                             // Request audio permission and start recording
                             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
                     },
-                    enabled = isModelVerified && !isLoading,
+                    enabled = if (voiceState.isRecording) true else modelState.isSTTLoaded && !isLoading,
                     modifier = Modifier
                         .size(50.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
-                            if (voiceState.isRecording) {
-                                // Recording - red gradient
-                                Brush.linearGradient(
-                                    listOf(Color(0xFFEF4444), Color(0xFFF87171))
-                                )
-                            } else if (isModelVerified && !isLoading) {
-                                // Ready - green/teal gradient
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.secondary,
-                                        MaterialTheme.colorScheme.tertiary
+                            when {
+                                voiceState.isRecording -> {
+                                    // Recording - red gradient
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFFEF4444), Color(0xFFF87171))
                                     )
-                                )
-                            } else {
-                                // Disabled - gray
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        MaterialTheme.colorScheme.surfaceVariant
+                                }
+                                modelState.isSTTLoaded && !isLoading -> {
+                                    // Ready - green/teal gradient
+                                    Brush.linearGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.secondary,
+                                            MaterialTheme.colorScheme.tertiary
+                                        )
                                     )
-                                )
+                                }
+                                else -> {
+                                    // Disabled - gray
+                                    Brush.linearGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.surfaceVariant,
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                    )
+                                }
                             }
                         )
                 ) {
