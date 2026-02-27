@@ -172,54 +172,67 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 if (success) {
                     _statusMessage.value = "Initializing model..."
                     // Give the model time to fully initialize
-                    kotlinx.coroutines.delay(2000)
+                    kotlinx.coroutines.delay(3000) // Increased delay for better initialization
 
-                    // Try verification with retries
+                    // Try verification with retries - ONLY set verified if it actually works
                     var verificationSuccess = false
+                    var verificationAttempts = 0
 
-                    repeat(3) { attempt ->
+                    repeat(5) { attempt ->
                         try {
-                            _statusMessage.value =
-                                if (attempt == 0) "Testing model..." else "Retrying... (${attempt + 1}/3)"
-                            val testResponse = RunAnywhere.generate("Test")
-                            if (testResponse.isNotEmpty()) {
+                            verificationAttempts = attempt + 1
+                            _statusMessage.value = "Verifying model... (${attempt + 1}/5)"
+                            Log.d("ChatViewModel", "Verification attempt ${attempt + 1}: Sending test message")
+                            
+                            val testResponse = RunAnywhere.generate("Hello")
+                            Log.d("ChatViewModel", "Test response received: '${testResponse.take(50)}'")
+                            
+                            if (testResponse.isNotEmpty() && !testResponse.contains("error", ignoreCase = true)) {
                                 verificationSuccess = true
+                                Log.d("ChatViewModel", "Verification successful on attempt ${attempt + 1}")
                                 return@repeat // Exit the retry loop
+                            } else {
+                                Log.w("ChatViewModel", "Test response empty or contains error: '$testResponse'")
                             }
                         } catch (e: Exception) {
-                            android.util.Log.e(
-                                "ChatViewModel",
-                                "Verification attempt ${attempt + 1} failed: ${e.message}"
-                            )
+                            Log.e("ChatViewModel", "Verification attempt ${attempt + 1} failed: ${e.message}", e)
                             // Wait longer before retry
-                            if (attempt < 2) {
+                            if (attempt < 4) {
                                 kotlinx.coroutines.delay(2000)
                             }
                         }
                     }
 
-                    // Always mark as loaded - let actual usage determine if there are issues
-                    _currentModelId.value = modelId
-                    _isModelVerified.value = true
-
+                    // ONLY mark as verified if verification actually succeeded
                     if (verificationSuccess) {
+                        _currentModelId.value = modelId
+                        _isModelVerified.value = true
                         _statusMessage.value = "Model ready! You can start chatting."
+                        Log.d("ChatViewModel", "Model successfully loaded and verified: $modelId")
                     } else {
-                        _statusMessage.value = "Model loaded. Ready to chat."
-                        android.util.Log.w(
-                            "ChatViewModel",
-                            "Model loaded but verification didn't complete - will verify on first use"
-                        )
+                        _currentModelId.value = null
+                        _isModelVerified.value = false
+                        _statusMessage.value = "Failed to verify model after $verificationAttempts attempts. Please download a different model."
+                        Log.e("ChatViewModel", "Model verification failed after $verificationAttempts attempts")
+                        
+                        // Try to unload the failed model
+                        try {
+                            RunAnywhere.unloadModel()
+                        } catch (e: Exception) {
+                            Log.e("ChatViewModel", "Failed to unload model after verification failure")
+                        }
                     }
                 } else {
                     _statusMessage.value = "Failed to load model. Please try again."
                     _currentModelId.value = null
                     _isModelVerified.value = false
+                    Log.e("ChatViewModel", "RunAnywhere.loadModel() returned false for modelId: $modelId")
                 }
             } catch (e: Exception) {
-                _statusMessage.value = "Error: ${e.message}. Please try reloading."
+                _statusMessage.value = "Error loading model: ${e.message}"
                 _currentModelId.value = null
                 _isModelVerified.value = false
+                Log.e("ChatViewModel", "Exception in loadModel: ${e.message}", e)
             }
         }
     }

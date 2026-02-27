@@ -256,8 +256,8 @@ fun ChatScreen(
             }
         }
 
-        // 🔥 MODEL SETUP BANNER (shown when no model is loaded)
-        if (currentModelId == null && !isModelVerified && !statusMessage.contains("Loading", ignoreCase = true) && !statusMessage.contains("Initializing", ignoreCase = true)) {
+        // 🔥 MODEL SETUP BANNER (shown only when model is NOT verified and not loading)
+        if (!isModelVerified && (statusMessage.contains("Setup", ignoreCase = true) || statusMessage.contains("Download", ignoreCase = true) || statusMessage.contains("failed", ignoreCase = true))) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -319,8 +319,8 @@ fun ChatScreen(
             }
         }
         
-        // 🔥 MODEL LOADING BANNER (shown when model is being loaded)
-        if ((statusMessage.contains("Loading", ignoreCase = true) || statusMessage.contains("Initializing", ignoreCase = true) || statusMessage.contains("Testing", ignoreCase = true)) && !isModelVerified) {
+        // 🔥 MODEL LOADING BANNER (shown when model is being loaded/verified)
+        if ((statusMessage.contains("Loading", ignoreCase = true) || statusMessage.contains("Initializing", ignoreCase = true) || statusMessage.contains("Verifying", ignoreCase = true)) && !isModelVerified) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
