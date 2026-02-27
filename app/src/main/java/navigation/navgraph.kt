@@ -218,11 +218,7 @@ fun AppNavGraph(
 
         // Voice Assistant Screen
         composable(route = Routes.VoiceAssistant) {
-            VoiceAssistantScreen(
-                onBack = {
-                    navController.popBackStack()
-                }
-            )
+            VoiceAssistantScreen(navController = navController)
         }
 
         // Medicine Analysis Screen (OCR to AI Analysis Pipeline)

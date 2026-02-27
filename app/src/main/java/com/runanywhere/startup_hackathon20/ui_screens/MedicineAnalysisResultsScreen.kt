@@ -312,7 +312,7 @@ private fun AnalysisSection(
             items.forEach { item ->
                 Row(
                     modifier = Modifier.padding(vertical = 4.dp),
-                    crossAxisAlignment = Alignment.Top
+                    verticalAlignment = Alignment.Top
                 ) {
                     Text(
                         text = "•",
