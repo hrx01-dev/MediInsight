@@ -1,8 +1,6 @@
 package com.runanywhere.startup_hackathon20.ui_screens
 
-import android.app.Activity
-import android.content.Intent
-import android.speech.RecognizerIntent
+import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -29,14 +27,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.startup_hackathon20.ChatViewModel
 import com.runanywhere.startup_hackathon20.ChatMessage
 import com.runanywhere.startup_hackathon20.R
 import com.runanywhere.startup_hackathon20.ui.theme.Startup_hackathon20Theme
+import com.runanywhere.startup_hackathon20.viewmodel.VoiceViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 data class Message(
     val text: String,
@@ -46,22 +45,31 @@ data class Message(
 @Composable
 fun ChatScreen(
     onBack: () -> Unit,
-    viewModel: ChatViewModel? = viewModel()
+    viewModel: ChatViewModel? = viewModel(),
+    voiceViewModel: VoiceViewModel? = viewModel()
 ) {
     var inputText by remember { mutableStateOf(TextFieldValue("")) }
     var showModelDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // Voice input launcher
-    val speechRecognizerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-            spokenText?.firstOrNull()?.let { text ->
-                // Set the recognized text to the input field
-                inputText = TextFieldValue(text)
-            }
+    // Voice state from VoiceViewModel
+    val voiceState by (voiceViewModel?.voiceState ?: MutableStateFlow(com.runanywhere.startup_hackathon20.viewmodel.VoiceState())).collectAsState()
+    val modelState by (voiceViewModel?.modelState ?: MutableStateFlow(com.runanywhere.startup_hackathon20.viewmodel.ModelLoadingState())).collectAsState()
+
+    // Audio permission launcher
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // Permission granted, start recording
+            voiceViewModel?.startRecording()
+        }
+    }
+
+    // Update input text when transcription is complete
+    LaunchedEffect(voiceState.transcribedText) {
+        if (voiceState.transcribedText.isNotEmpty() && !voiceState.isTranscribing) {
+            inputText = TextFieldValue(voiceState.transcribedText)
         }
     }
 
@@ -626,13 +634,75 @@ fun ChatScreen(
             }
         }
 
-        // 🔥 INPUT FIELD + SEND BUTTON
-        Row(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // 🔥 INPUT FIELD + VOICE STATUS + SEND BUTTON
+        Column(
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
         ) {
+            // Voice recording status indicator
+            if (voiceState.isRecording || voiceState.isTranscribing) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (voiceState.isRecording) 
+                            Color(0xFFEF4444).copy(alpha = 0.1f) 
+                        else 
+                            MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (voiceState.isRecording) {
+                            // Recording animation
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFEF4444))
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "🎤 Recording... Tap stop when done",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFEF4444)
+                            )
+                        } else if (voiceState.isTranscribing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Processing speech...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        
+                        // Audio level indicator (if recording)
+                        if (voiceState.isRecording && voiceState.audioLevel > 0) {
+                            Spacer(Modifier.weight(1f))
+                            LinearProgressIndicator(
+                                progress = { voiceState.audioLevel },
+                                modifier = Modifier.width(60.dp),
+                                color = Color(0xFFEF4444),
+                            )
+                        }
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
 
             OutlinedTextField(
                 value = inputText,
@@ -654,23 +724,35 @@ fun ChatScreen(
 
             Spacer(Modifier.width(8.dp))
 
-            // Voice Input Button
+            // Voice Input Button - RunAnywhere STT
             IconButton(
                 onClick = {
-                    // Start voice recognition
-                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                    if (voiceState.isRecording) {
+                        // Stop recording and transcribe
+                        voiceViewModel?.stopRecordingAndTranscribe()
+                    } else {
+                        // Check if STT model is loaded
+                        if (!modelState.isSTTLoaded) {
+                            // Show message to load STT model first
+                            // You might want to add a Snackbar or Toast here
+                            return@IconButton
+                        }
+                        // Request audio permission and start recording
+                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     }
-                    speechRecognizerLauncher.launch(intent)
                 },
                 enabled = isModelVerified && !isLoading,
                 modifier = Modifier
                     .size(50.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(
-                        if (isModelVerified && !isLoading) {
+                        if (voiceState.isRecording) {
+                            // Recording - red gradient
+                            Brush.linearGradient(
+                                listOf(Color(0xFFEF4444), Color(0xFFF87171))
+                            )
+                        } else if (isModelVerified && !isLoading) {
+                            // Ready - green/teal gradient
                             Brush.linearGradient(
                                 listOf(
                                     MaterialTheme.colorScheme.secondary,
@@ -678,6 +760,7 @@ fun ChatScreen(
                                 )
                             )
                         } else {
+                            // Disabled - gray
                             Brush.linearGradient(
                                 listOf(
                                     MaterialTheme.colorScheme.surfaceVariant,
@@ -687,12 +770,21 @@ fun ChatScreen(
                         }
                     )
             ) {
-                Icon(
-                    imageVector = Icons.Default.Mic,
-                    contentDescription = "Voice Input",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(24.dp)
-                )
+                if (voiceState.isTranscribing) {
+                    // Show loading indicator while transcribing
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (voiceState.isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                        contentDescription = if (voiceState.isRecording) "Stop Recording" else "Voice Input",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
 
             Spacer(Modifier.width(8.dp))
