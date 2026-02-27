@@ -48,6 +48,7 @@ import java.util.concurrent.Executors
 fun MedicineScannerScreen(
     onBack: () -> Unit,
     onNavigateToChat: (String) -> Unit = {},
+    onNavigateToInsights: (String) -> Unit = {},
     scannerViewModel: ScannerViewModel = viewModel(),
     sharedViewModel: SharedMedicineViewModel = viewModel()
 ) {
@@ -155,6 +156,10 @@ Please provide detailed information about this medicine:
 
 Thank you!"""
                             onNavigateToChat(presetMessage)
+                        },
+                        onAddToInsights = {
+                            // Navigate to insights with scanned text
+                            onNavigateToInsights(detectedText)
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -335,6 +340,7 @@ private fun ResultsSection(
     onToggleScanning: () -> Unit,
     onClearHistory: () -> Unit,
     onAskAI: () -> Unit,
+    onAddToInsights: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -448,7 +454,7 @@ private fun ResultsSection(
 
                     // Add to Insights Button
                     Button(
-                        onClick = onClearHistory,
+                        onClick = onAddToInsights,
                         modifier = Modifier
                             .weight(1f)
                             .height(56.dp),

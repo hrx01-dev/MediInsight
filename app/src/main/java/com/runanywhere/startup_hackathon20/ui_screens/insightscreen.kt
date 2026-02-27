@@ -12,6 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -55,11 +58,76 @@ fun MedicineEntity.toMedicine() = Medicine(
 @Composable
 fun InsightsScreen(
     onBack: () -> Unit,
+    scannedText: String? = null,
     viewModel: MedicineViewModel = viewModel()
 ) {
     val medicines by viewModel.allMedicines.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    
+    // If we have scanned text, show a dialog to add it to insights
+    var showAddDialog by remember { mutableStateOf(!scannedText.isNullOrBlank()) }
+    var medicineName by remember { mutableStateOf(scannedText ?: "") }
+    var dosage by remember { mutableStateOf("") }
+    var frequency by remember { mutableStateOf("") }
+    
+    if (showAddDialog && !scannedText.isNullOrBlank()) {
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("Add Scanned Medicine to Insights") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    TextField(
+                        value = medicineName,
+                        onValueChange = { medicineName = it },
+                        label = { Text("Medicine Name/Details") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    )
+                    TextField(
+                        value = dosage,
+                        onValueChange = { dosage = it },
+                        label = { Text("Dosage") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    )
+                    TextField(
+                        value = frequency,
+                        onValueChange = { frequency = it },
+                        label = { Text("Frequency") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.insertMedicine(
+                            name = medicineName.ifBlank { "Scanned Medicine" },
+                            dosage = dosage.ifBlank { "N/A" },
+                            frequency = frequency.ifBlank { "N/A" },
+                            time = "",
+                            duration = "",
+                            quantity = "",
+                            instructions = scannedText
+                        )
+                        showAddDialog = false
+                    }
+                ) {
+                    Text("Save to Insights")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showAddDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Column(
         Modifier
