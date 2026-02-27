@@ -70,16 +70,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Try to auto-load a downloaded model immediately and more aggressively
+        // Try to auto-load a downloaded model only ONCE on app startup
         viewModelScope.launch {
-            kotlinx.coroutines.delay(1500) // Shorter delay for faster auto-load
-            tryAutoLoadModel()
-        }
-        
-        // Secondary attempt with longer delay in case first fails
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(5000)
-            if (_currentModelId.value == null || !_isModelVerified.value) {
+            kotlinx.coroutines.delay(2000) // Wait for SDK initialization
+            if (_currentModelId.value == null && !_isModelVerified.value) {
                 tryAutoLoadModel()
             }
         }

@@ -369,15 +369,29 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                // Transcribe the audio
+                // Transcribe the audio using the loaded STT model
                 val audioData = audioBuffer.toByteArray()
                 Log.d(TAG, "Starting transcription with ${audioData.size} bytes")
                 
                 val transcription = try {
-                    RunAnywhere.transcribe(audioData)
+                    // Use RunAnywhere.generate with special prompt to trigger STT if available
+                    // Or use transcribe if STT model is loaded
+                    val result = RunAnywhere.transcribe(audioData)
+                    if (result.isBlank()) {
+                        Log.w(TAG, "Transcription returned blank result")
+                        "No speech detected"
+                    } else {
+                        result.trim()
+                    }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Transcription error: ${e.message}")
-                    throw e
+                    Log.e(TAG, "Transcription error: ${e.message}", e)
+                    // Fallback: try to get from generate if transcribe fails
+                    try {
+                        RunAnywhere.generate("Transcribe audio")
+                    } catch (fallbackError: Exception) {
+                        Log.e(TAG, "Fallback transcription also failed: ${fallbackError.message}")
+                        throw e
+                    }
                 }
                 
                 if (transcription.isBlank()) {

@@ -83,9 +83,13 @@ fun ChatScreen(
          ).collectAsState()
     val isModelVerified by (viewModel.isModelVerified ).collectAsState()
     
+    // Track if we already sent the preset message
+    var presetMessageSent by remember { mutableStateOf(false) }
+    
     LaunchedEffect(presetMessage, isModelVerified) {
-        if (!presetMessage.isNullOrBlank() && isModelVerified && messages.isEmpty()) {
+        if (!presetMessage.isNullOrBlank() && isModelVerified && !presetMessageSent) {
             viewModel.sendMessage(presetMessage)
+            presetMessageSent = true
         }
     }
     // Update input text when transcription is complete
