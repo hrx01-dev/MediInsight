@@ -35,6 +35,7 @@ import com.runanywhere.startup_hackathon20.ChatMessage
 import com.runanywhere.startup_hackathon20.R
 import com.runanywhere.startup_hackathon20.ui.theme.Startup_hackathon20Theme
 import com.runanywhere.startup_hackathon20.viewmodel.VoiceViewModel
+import com.runanywhere.startup_hackathon20.viewmodel.AndroidSpeechViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
@@ -48,25 +49,22 @@ fun ChatScreen(
     presetMessage: String? = null,
     onBack: () -> Unit,
     viewModel: ChatViewModel = viewModel(),
-    voiceViewModel: VoiceViewModel= viewModel()
+    androidSpeechViewModel: AndroidSpeechViewModel = viewModel()
 ) {
     var inputText by remember { mutableStateOf(TextFieldValue("")) }
     var showModelDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // Voice state from VoiceViewModel
-    val voiceState by (voiceViewModel.voiceState
-        ?: MutableStateFlow(com.runanywhere.startup_hackathon20.viewmodel.VoiceState())).collectAsState()
-    val modelState by (voiceViewModel.modelState
-        ?: MutableStateFlow(com.runanywhere.startup_hackathon20.viewmodel.ModelLoadingState())).collectAsState()
+    // Android Speech Recognition state
+    val speechState by androidSpeechViewModel.speechState.collectAsState()
 
     // Audio permission launcher
     val audioPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            // Permission granted, start recording
-            voiceViewModel?.startRecording()
+            // Permission granted, start listening
+            androidSpeechViewModel.startListening()
         } else {
             // Permission denied - show a message to user
             // You could also show a dialog explaining why the permission is needed
@@ -105,20 +103,12 @@ fun ChatScreen(
         }
     }
     
-    // Sync VoiceViewModel STT state with ChatViewModel model state
-    LaunchedEffect(isModelVerified, currentModelId) {
-        val modelId = currentModelId // Capture in local variable for smart cast
-        if (isModelVerified && modelId != null) {
-            // Model is loaded in ChatViewModel, enable STT in VoiceViewModel
-            voiceViewModel?.loadSTTModel(modelId)
-        }
-    }
-    // Update input text when transcription is complete
-    LaunchedEffect(voiceState.transcribedText) {
-        if (voiceState.transcribedText.isNotEmpty() && !voiceState.isTranscribing) {
-            inputText = TextFieldValue(voiceState.transcribedText)
+    // Update input text when Android speech transcription is complete
+    LaunchedEffect(speechState.transcribedText) {
+        if (speechState.transcribedText.isNotEmpty() && !speechState.isListening && !speechState.isProcessing) {
+            inputText = TextFieldValue(speechState.transcribedText)
             // Clear the transcribed text to avoid duplicate entries on next recording
-            voiceViewModel?.clearTranscription()
+            androidSpeechViewModel.clearTranscription()
         }
     }
 
@@ -709,17 +699,17 @@ fun ChatScreen(
         Column(
             modifier = Modifier.background(MaterialTheme.colorScheme.surface)
         ) {
-            // Voice recording status indicator
-            if (voiceState.isRecording || voiceState.isTranscribing) {
+            // Android Speech Recognition status indicator
+            if (speechState.isListening || speechState.isProcessing) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (voiceState.isRecording)
-                            Color(0xFFEF4444).copy(alpha = 0.1f)
+                        containerColor = if (speechState.isListening)
+                            Color(0xFF10B981).copy(alpha = 0.1f)  // Green for listening
                         else
-                            MaterialTheme.colorScheme.primaryContainer
+                            MaterialTheme.colorScheme.primaryContainer  // Blue for processing
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -727,21 +717,21 @@ fun ChatScreen(
                         modifier = Modifier.padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (voiceState.isRecording) {
-                            // Recording animation
+                        if (speechState.isListening) {
+                            // Listening animation
                             Box(
                                 modifier = Modifier
                                     .size(12.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFFEF4444))
+                                    .background(Color(0xFF10B981))
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                "🎤 Recording... Tap stop when done",
+                                "🎤 Listening... Speak now or tap to stop",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFFEF4444)
+                                color = Color(0xFF059669)
                             )
-                        } else if (voiceState.isTranscribing) {
+                        } else if (speechState.isProcessing) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp,
@@ -749,27 +739,27 @@ fun ChatScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                "Processing speech...",
+                                speechState.statusMessage,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
-                        // Audio level indicator (if recording)
-                        if (voiceState.isRecording && voiceState.audioLevel > 0) {
+                        // Audio level indicator (if listening)
+                        if (speechState.isListening && speechState.audioLevel > 0) {
                             Spacer(Modifier.weight(1f))
                             LinearProgressIndicator(
-                                progress = { voiceState.audioLevel },
+                                progress = { speechState.audioLevel },
                                 modifier = Modifier.width(60.dp),
-                                color = Color(0xFFEF4444),
+                                color = Color(0xFF10B981),
                             )
                         }
                      }
                  }
              }
              
-             // STT model status warning
-             if (!voiceState.isRecording && !voiceState.isTranscribing && !modelState.isSTTLoaded) {
+             // Speech recognition availability warning
+             if (!speechState.isListening && !speechState.isProcessing && !speechState.isAvailable) {
                  Card(
                      modifier = Modifier
                          .fillMaxWidth()
@@ -793,7 +783,7 @@ fun ChatScreen(
                          )
                          Spacer(Modifier.width(8.dp))
                          Text(
-                             "Load an STT model to use voice input",
+                             speechState.statusMessage,
                              style = MaterialTheme.typography.bodySmall,
                              color = Color(0xFF92400E)
                          )
@@ -828,38 +818,38 @@ fun ChatScreen(
 
                 Spacer(Modifier.width(8.dp))
 
-                // Voice Input Button - RunAnywhere STT
+                // Voice Input Button - Android Speech Recognition
                 IconButton(
                     onClick = {
-                        if (voiceState.isRecording) {
-                            // Stop recording and transcribe
-                            voiceViewModel?.stopRecordingAndTranscribe()
+                        if (speechState.isListening) {
+                            // Stop listening
+                            androidSpeechViewModel.stopListening()
                         } else {
-                            // Check if STT model is loaded
-                            if (!modelState.isSTTLoaded) {
-                                // Show message to load STT model first
+                            // Check if speech recognition is available
+                            if (!speechState.isAvailable) {
+                                // Speech recognition not available
                                 return@IconButton
                             }
-                            // Clear any previous transcription before starting new recording
-                            voiceViewModel?.clearTranscription()
-                            // Request audio permission and start recording
+                            // Clear any previous transcription before starting new listening
+                            androidSpeechViewModel.clearTranscription()
+                            // Request audio permission and start listening
                             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
                     },
-                    enabled = if (voiceState.isRecording) true else modelState.isSTTLoaded && !isLoading,
+                    enabled = if (speechState.isListening) true else speechState.isAvailable && !isLoading,
                     modifier = Modifier
                         .size(50.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
                             when {
-                                voiceState.isRecording -> {
-                                    // Recording - red gradient
+                                speechState.isListening -> {
+                                    // Listening - green gradient
                                     Brush.linearGradient(
-                                        listOf(Color(0xFFEF4444), Color(0xFFF87171))
+                                        listOf(Color(0xFF10B981), Color(0xFF34D399))
                                     )
                                 }
-                                modelState.isSTTLoaded && !isLoading -> {
-                                    // Ready - green/teal gradient
+                                speechState.isAvailable && !isLoading -> {
+                                    // Ready - blue/teal gradient
                                     Brush.linearGradient(
                                         listOf(
                                             MaterialTheme.colorScheme.secondary,
@@ -879,8 +869,8 @@ fun ChatScreen(
                             }
                         )
                 ) {
-                    if (voiceState.isTranscribing) {
-                        // Show loading indicator while transcribing
+                    if (speechState.isProcessing) {
+                        // Show loading indicator while processing
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
                             color = Color.White,
@@ -888,8 +878,8 @@ fun ChatScreen(
                         )
                     } else {
                         Icon(
-                            imageVector = if (voiceState.isRecording) Icons.Default.Stop else Icons.Default.Mic,
-                            contentDescription = if (voiceState.isRecording) "Stop Recording" else "Voice Input",
+                            imageVector = if (speechState.isListening) Icons.Default.Stop else Icons.Default.Mic,
+                            contentDescription = if (speechState.isListening) "Stop Listening" else "Voice Input",
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
                         )
