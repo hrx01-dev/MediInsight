@@ -86,10 +86,14 @@ fun ChatScreen(
     // Track if we already sent the preset message
     var presetMessageSent by remember { mutableStateOf(false) }
     
-    LaunchedEffect(presetMessage, isModelVerified) {
-        if (!presetMessage.isNullOrBlank() && isModelVerified && !presetMessageSent) {
+    LaunchedEffect(presetMessage, isModelVerified, currentModelId) {
+        android.util.Log.d("ChatScreen", "Preset check - Message: ${!presetMessage.isNullOrBlank()}, Verified: $isModelVerified, ModelID: $currentModelId, Sent: $presetMessageSent")
+        if (!presetMessage.isNullOrBlank() && isModelVerified && currentModelId != null && !presetMessageSent) {
+            android.util.Log.d("ChatScreen", "Sending preset message: $presetMessage")
             viewModel.sendMessage(presetMessage)
             presetMessageSent = true
+        } else if (!presetMessage.isNullOrBlank() && !presetMessageSent) {
+            android.util.Log.d("ChatScreen", "Waiting for model - Verified: $isModelVerified, ModelID: $currentModelId")
         }
     }
     // Update input text when transcription is complete
