@@ -107,9 +107,10 @@ fun ChatScreen(
     
     // Sync VoiceViewModel STT state with ChatViewModel model state
     LaunchedEffect(isModelVerified, currentModelId) {
-        if (isModelVerified && currentModelId != null) {
+        val modelId = currentModelId // Capture in local variable for smart cast
+        if (isModelVerified && modelId != null) {
             // Model is loaded in ChatViewModel, enable STT in VoiceViewModel
-            voiceViewModel?.loadSTTModel(currentModelId)
+            voiceViewModel?.loadSTTModel(modelId)
         }
     }
     // Update input text when transcription is complete
