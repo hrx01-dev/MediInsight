@@ -25,190 +25,135 @@ data class AndroidSpeechState(
     val isAvailable: Boolean = false
 )
 
-/**
- * ViewModel for Android's built-in Speech Recognition
- * Uses SpeechRecognizer API instead of custom STT models
- */
 class AndroidSpeechViewModel(application: Application) : AndroidViewModel(application) {
-    
+
     private val TAG = "AndroidSpeechViewModel"
     private val context: Context = application.applicationContext
-    
-    // Speech state
+
     private val _speechState = MutableStateFlow(AndroidSpeechState())
     val speechState: StateFlow<AndroidSpeechState> = _speechState
-    
-    // Speech recognizer
+
     private var speechRecognizer: SpeechRecognizer? = null
     private var recognizerIntent: Intent? = null
-    
+
     init {
         initializeSpeechRecognizer()
     }
-    
+
     private fun initializeSpeechRecognizer() {
         try {
-            // Check if speech recognition is available
             val isAvailable = SpeechRecognizer.isRecognitionAvailable(context)
-            
+
             if (isAvailable) {
                 speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
                 setupRecognizerIntent()
                 setupRecognitionListener()
-                
+
                 _speechState.value = _speechState.value.copy(
                     isAvailable = true,
                     statusMessage = "Speech recognition ready"
                 )
-                Log.d(TAG, "Speech recognizer initialized successfully")
             } else {
                 _speechState.value = _speechState.value.copy(
                     isAvailable = false,
-                    statusMessage = "Speech recognition not available on this device",
+                    statusMessage = "Speech recognition not available",
                     error = "Speech recognition service not available"
                 )
-                Log.w(TAG, "Speech recognition not available")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error initializing speech recognizer: ${e.message}", e)
             _speechState.value = _speechState.value.copy(
                 isAvailable = false,
-                error = "Failed to initialize: ${e.message}",
+                error = "Initialization failed: ${e.message}",
                 statusMessage = "Speech recognition initialization failed"
             )
         }
     }
-    
+
     private fun setupRecognizerIntent() {
         recognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000)
         }
     }
-    
+
     private fun setupRecognitionListener() {
         speechRecognizer?.setRecognitionListener(object : RecognitionListener {
-            
+
             override fun onReadyForSpeech(params: Bundle?) {
-                Log.d(TAG, "onReadyForSpeech called")
                 viewModelScope.launch {
                     _speechState.value = _speechState.value.copy(
                         isListening = true,
                         isProcessing = false,
-                        statusMessage = "Listening... Speak now",
+                        statusMessage = "Listening...",
                         error = null
                     )
-                    Log.d(TAG, "State after onReadyForSpeech: isListening=true, isProcessing=false")
                 }
             }
-            
-            override fun onBeginningOfSpeech() {
-                Log.d(TAG, "Beginning of speech detected")
-                viewModelScope.launch {
-                    _speechState.value = _speechState.value.copy(
-                        statusMessage = "Speech detected...",
-                        audioLevel = 0.5f
-                    )
-                }
-            }
-            
+
+            override fun onBeginningOfSpeech() {}
+
             override fun onRmsChanged(rmsdB: Float) {
-                // Convert RMS to a 0-1 range for audio level indicator
-                val level = (rmsdB + 10f) / 20f // Normalize roughly
-                val clampedLevel = level.coerceIn(0f, 1f)
-                
+                val level = ((rmsdB + 10f) / 20f).coerceIn(0f, 1f)
                 viewModelScope.launch {
-                    _speechState.value = _speechState.value.copy(audioLevel = clampedLevel)
+                    _speechState.value = _speechState.value.copy(audioLevel = level)
                 }
             }
-            
-            override fun onBufferReceived(buffer: ByteArray?) {
-                // Optional: Handle raw audio buffer if needed
-                Log.d(TAG, "Buffer received: ${buffer?.size ?: 0} bytes")
-            }
-            
+
+            override fun onBufferReceived(buffer: ByteArray?) {}
+
             override fun onEndOfSpeech() {
-                Log.d(TAG, "onEndOfSpeech called")
                 viewModelScope.launch {
                     _speechState.value = _speechState.value.copy(
                         isListening = false,
                         isProcessing = true,
-                        statusMessage = "Processing speech...",
+                        statusMessage = "Processing...",
                         audioLevel = 0f
                     )
-                    Log.d(TAG, "State after onEndOfSpeech: isListening=false, isProcessing=true")
                 }
             }
-            
+
             override fun onError(error: Int) {
-                val errorMessage = when (error) {
-                    SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
-                    SpeechRecognizer.ERROR_CLIENT -> "Client side error" 
-                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
-                    SpeechRecognizer.ERROR_NETWORK -> "Network error"
-                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-                    SpeechRecognizer.ERROR_NO_MATCH -> "No speech match found"
-                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy"
-                    SpeechRecognizer.ERROR_SERVER -> "Server error"
-                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input detected"
-                    else -> "Unknown error: $error"
-                }
-                
-                Log.e(TAG, "Speech recognition error: $errorMessage")
                 viewModelScope.launch {
                     _speechState.value = _speechState.value.copy(
                         isListening = false,
                         isProcessing = false,
-                        error = errorMessage,
-                        statusMessage = if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-                            "No speech detected. Try again."
-                        } else {
-                            "Error: $errorMessage"
-                        },
+                        statusMessage = "Error occurred",
+                        error = "Speech recognition error: $error",
                         audioLevel = 0f
                     )
                 }
             }
-            
+
+            // ✅ FIXED VERSION (IMPORTANT PART)
             override fun onResults(results: Bundle?) {
-                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val matches =
+                    results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 val transcription = matches?.firstOrNull() ?: ""
-                
-                Log.d(TAG, "onResults called - transcription: '$transcription' (matches: ${matches?.size ?: 0})")
-                Log.d(TAG, "All matches: $matches")
-                
+
                 viewModelScope.launch {
-                    val oldState = _speechState.value
-                    Log.d(TAG, "State before onResults: isListening=${oldState.isListening}, isProcessing=${oldState.isProcessing}, transcribedText='${oldState.transcribedText}'")
-                    
                     _speechState.value = _speechState.value.copy(
                         isListening = false,
                         isProcessing = false,
                         transcribedText = transcription,
                         statusMessage = if (transcription.isNotEmpty()) {
-                            "Speech recognized: $transcription"
+                            "Speech recognized"
                         } else {
                             "No speech recognized"
                         },
                         audioLevel = 0f,
                         error = null
                     )
-                    
-                    val newState = _speechState.value
-                    Log.d(TAG, "State after onResults: isListening=${newState.isListening}, isProcessing=${newState.isProcessing}, transcribedText='${newState.transcribedText}'")
                 }
             }
-            
+
             override fun onPartialResults(partialResults: Bundle?) {
-                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val matches =
+                    partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 val partialText = matches?.firstOrNull() ?: ""
-                
+
                 if (partialText.isNotEmpty()) {
-                    Log.d(TAG, "Partial results: $partialText")
                     viewModelScope.launch {
                         _speechState.value = _speechState.value.copy(
                             statusMessage = "Recognizing: $partialText"
@@ -216,151 +161,48 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
                     }
                 }
             }
-            
-            override fun onEvent(eventType: Int, params: Bundle?) {
-                Log.d(TAG, "Speech event: $eventType")
-            }
+
+            override fun onEvent(eventType: Int, params: Bundle?) {}
         })
     }
-    
-    /**
-     * Start listening for speech input
-     */
+
     fun startListening() {
-        Log.d(TAG, "startListening() called")
         viewModelScope.launch {
-            try {
-                Log.d(TAG, "Checking if speech recognition is available: ${_speechState.value.isAvailable}")
-                if (!_speechState.value.isAvailable) {
-                    Log.w(TAG, "Speech recognition not available")
-                    _speechState.value = _speechState.value.copy(
-                        error = "Speech recognition not available",
-                        statusMessage = "Speech recognition service not available"
-                    )
-                    return@launch
-                }
-                
-                Log.d(TAG, "Checking current state - isListening: ${_speechState.value.isListening}, isProcessing: ${_speechState.value.isProcessing}")
-                if (_speechState.value.isListening || _speechState.value.isProcessing) {
-                    Log.w(TAG, "Already listening or processing, skipping...")
-                    return@launch
-                }
-                
-                Log.d(TAG, "Clearing previous results...")
-                // Clear previous results
-                _speechState.value = _speechState.value.copy(
-                    transcribedText = "", // Clear old transcription
-                    error = null,
-                    statusMessage = "Initializing...",
-                    audioLevel = 0f
-                )
-                
-                recognizerIntent?.let { intent ->
-                    Log.d(TAG, "Starting speech recognizer...")
-                    speechRecognizer?.startListening(intent)
-                    Log.d(TAG, "Speech recognizer started successfully")
-                } ?: run {
-                    Log.e(TAG, "Recognition intent is null!")
-                    _speechState.value = _speechState.value.copy(
-                        error = "Recognition intent not configured",
-                        statusMessage = "Failed to start listening"
-                    )
-                }
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error starting speech recognition: ${e.message}", e)
-                _speechState.value = _speechState.value.copy(
-                    isListening = false,
-                    isProcessing = false,
-                    error = "Failed to start: ${e.message}",
-                    statusMessage = "Error starting speech recognition"
-                )
+            if (!_speechState.value.isAvailable) return@launch
+            if (_speechState.value.isListening || _speechState.value.isProcessing) return@launch
+
+            _speechState.value = _speechState.value.copy(
+                transcribedText = "",
+                error = null,
+                statusMessage = "Initializing..."
+            )
+
+            recognizerIntent?.let {
+                speechRecognizer?.startListening(it)
             }
         }
     }
-    
-    /**
-     * Stop listening for speech input
-     */
+
     fun stopListening() {
         viewModelScope.launch {
-            try {
-                speechRecognizer?.stopListening()
-                Log.d(TAG, "Stopped listening for speech")
-                
-                _speechState.value = _speechState.value.copy(
-                    isListening = false,
-                    statusMessage = "Stopped listening",
-                    audioLevel = 0f
-                )
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error stopping speech recognition: ${e.message}", e)
-                _speechState.value = _speechState.value.copy(
-                    isListening = false,
-                    isProcessing = false,
-                    error = "Error stopping: ${e.message}",
-                    audioLevel = 0f
-                )
-            }
+            speechRecognizer?.stopListening()
+            _speechState.value = _speechState.value.copy(
+                isListening = false,
+                audioLevel = 0f
+            )
         }
     }
-    
-    /**
-     * Cancel current speech recognition
-     */
-    fun cancelListening() {
-        viewModelScope.launch {
-            try {
-                speechRecognizer?.cancel()
-                Log.d(TAG, "Cancelled speech recognition")
-                
-                _speechState.value = _speechState.value.copy(
-                    isListening = false,
-                    isProcessing = false,
-                    statusMessage = "Cancelled",
-                    audioLevel = 0f,
-                    error = null
-                )
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error cancelling speech recognition: ${e.message}", e)
-                _speechState.value = _speechState.value.copy(
-                    isListening = false,
-                    isProcessing = false,
-                    audioLevel = 0f
-                )
-            }
-        }
-    }
-    
-    /**
-     * Clear the transcribed text
-     */
+
     fun clearTranscription() {
-        Log.d(TAG, "Clearing transcription")
         _speechState.value = _speechState.value.copy(
             transcribedText = "",
-            error = null,
-            statusMessage = if (_speechState.value.isAvailable) "Ready to listen" else "Speech recognition not available"
+            statusMessage = "Ready to listen"
         )
     }
-    
-    /**
-     * Check if speech recognition is available
-     */
-    fun isRecognitionAvailable(): Boolean {
-        return _speechState.value.isAvailable
-    }
-    
+
     override fun onCleared() {
         super.onCleared()
-        try {
-            speechRecognizer?.destroy()
-            speechRecognizer = null
-            Log.d(TAG, "Speech recognizer destroyed")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error destroying speech recognizer: ${e.message}", e)
-        }
+        speechRecognizer?.destroy()
+        speechRecognizer = null
     }
 }

@@ -48,6 +48,7 @@ class VoiceManager(private val context: Context) {
 
     private val _recognizedText = MutableStateFlow("")
     val recognizedText: StateFlow<String> = _recognizedText.asStateFlow()
+    var onSpeechResult: ((String) -> Unit)? = null
 
     private val _sttError = MutableStateFlow<String?>(null)
     val sttError: StateFlow<String?> = _sttError.asStateFlow()

@@ -59,6 +59,10 @@ fun ChatScreen(
 
     // Android Speech Recognition state
     val speechState by androidSpeechViewModel.speechState.collectAsState()
+    TextField(
+        value = speechState.transcribedText,
+        onValueChange = { }
+    )
 
     // Audio permission launcher
     val audioPermissionLauncher = rememberLauncherForActivityResult(
@@ -108,13 +112,22 @@ fun ChatScreen(
         }
     }
     // SIMPLE TEST: Just set text whenever transcribedText changes (no conditions)
-    LaunchedEffect(speechState.transcribedText) {
-        android.util.Log.d("ChatScreen", "Simple LaunchedEffect - transcribedText changed to: '${speechState.transcribedText}'")
-        if (speechState.transcribedText.isNotEmpty()) {
-            android.util.Log.d("ChatScreen", "SIMPLE TEST - Setting input text to: '${speechState.transcribedText}'")
-            android.util.Log.d("ChatScreen", "Input text before: '${inputText.text}'")
+    LaunchedEffect(
+        speechState.transcribedText,
+        speechState.isListening,
+        speechState.isProcessing
+    ) {
+        if (
+            speechState.transcribedText.isNotEmpty() &&
+            !speechState.isListening &&
+            !speechState.isProcessing &&
+            speechState.error == null
+        ) {
             inputText = TextFieldValue(speechState.transcribedText)
-            android.util.Log.d("ChatScreen", "Input text after: '${inputText.text}'")
+
+            // Important: Clear transcription AFTER setting text
+            kotlinx.coroutines.delay(200)
+            androidSpeechViewModel.clearTranscription()
         }
     }
     
