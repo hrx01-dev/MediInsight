@@ -1,6 +1,8 @@
 package com.runanywhere.startup_hackathon20.ui_screens
 
 import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -62,10 +64,13 @@ fun ChatScreen(
     val audioPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
+        android.util.Log.d("ChatScreen", "Audio permission result: $isGranted")
         if (isGranted) {
             // Permission granted, start listening
+            android.util.Log.d("ChatScreen", "Permission granted, starting listening...")
             androidSpeechViewModel.startListening()
         } else {
+            android.util.Log.w("ChatScreen", "Audio permission denied")
             // Permission denied - show a message to user
             // You could also show a dialog explaining why the permission is needed
         }
@@ -102,35 +107,70 @@ fun ChatScreen(
             android.util.Log.d("ChatScreen", "Waiting for model - Verified: $isModelVerified, ModelID: $currentModelId, Status: $statusMessage")
         }
     }
+    // SIMPLE TEST: Just set text whenever transcribedText changes (no conditions)
+    LaunchedEffect(speechState.transcribedText) {
+        android.util.Log.d("ChatScreen", "Simple LaunchedEffect - transcribedText changed to: '${speechState.transcribedText}'")
+        if (speechState.transcribedText.isNotEmpty()) {
+            android.util.Log.d("ChatScreen", "SIMPLE TEST - Setting input text to: '${speechState.transcribedText}'")
+            android.util.Log.d("ChatScreen", "Input text before: '${inputText.text}'")
+            inputText = TextFieldValue(speechState.transcribedText)
+            android.util.Log.d("ChatScreen", "Input text after: '${inputText.text}'")
+        }
+    }
     
+    // Debug: Log all speech state changes
+    LaunchedEffect(speechState) {
+        android.util.Log.d("ChatScreen", "SpeechState changed: isListening=${speechState.isListening}, " +
+                "isProcessing=${speechState.isProcessing}, transcribedText='${speechState.transcribedText}', " +
+                "error=${speechState.error}, statusMessage='${speechState.statusMessage}'")
+    }
+    
+    // REMOVED COMPLEX CONDITIONS FOR TESTING - will re-add after basic version works
+    /*
     // Update input text when Android speech transcription is complete
     LaunchedEffect(speechState.transcribedText, speechState.isListening, speechState.isProcessing) {
+        android.util.Log.d("ChatScreen", "LaunchedEffect1 triggered - transcribedText='${speechState.transcribedText}', " +
+                "isListening=${speechState.isListening}, isProcessing=${speechState.isProcessing}, error=${speechState.error}")
+        
         // Only update input text when we have transcription AND we're done processing
         if (speechState.transcribedText.isNotEmpty() && 
             !speechState.isListening && 
             !speechState.isProcessing &&
             speechState.error == null) {
             
-            android.util.Log.d("ChatScreen", "Setting transcribed text: '${speechState.transcribedText}'")
+            android.util.Log.d("ChatScreen", "CONDITIONS MET - Setting transcribed text: '${speechState.transcribedText}'")
+            android.util.Log.d("ChatScreen", "Current inputText before: '${inputText.text}'")
             inputText = TextFieldValue(speechState.transcribedText)
+            android.util.Log.d("ChatScreen", "Current inputText after: '${inputText.text}'")
             
             // Delay before clearing to ensure text is set properly
             kotlinx.coroutines.delay(500) // Increased delay to ensure UI update
+            android.util.Log.d("ChatScreen", "About to clear transcription...")
             androidSpeechViewModel.clearTranscription()
+        } else {
+            android.util.Log.d("ChatScreen", "CONDITIONS NOT MET - transcribedText.isEmpty()=${speechState.transcribedText.isEmpty()}, " +
+                    "isListening=${speechState.isListening}, isProcessing=${speechState.isProcessing}, error=${speechState.error}")
         }
     }
     
     // Alternative approach: Monitor when processing completes with text
     LaunchedEffect(speechState.isProcessing) {
+        android.util.Log.d("ChatScreen", "LaunchedEffect2 triggered - isProcessing=${speechState.isProcessing}")
+        
         // When processing changes from true to false, check if we have text
         if (!speechState.isProcessing && speechState.transcribedText.isNotEmpty() && speechState.error == null) {
             kotlinx.coroutines.delay(100) // Small delay to ensure state is stable
             if (inputText.text != speechState.transcribedText) { // Only update if different
-                android.util.Log.d("ChatScreen", "Fallback: Setting transcribed text: '${speechState.transcribedText}'")
+                android.util.Log.d("ChatScreen", "FALLBACK TRIGGERED - Setting transcribed text: '${speechState.transcribedText}'")
+                android.util.Log.d("ChatScreen", "Fallback: Current inputText before: '${inputText.text}'")
                 inputText = TextFieldValue(speechState.transcribedText)
+                android.util.Log.d("ChatScreen", "Fallback: Current inputText after: '${inputText.text}'")
+            } else {
+                android.util.Log.d("ChatScreen", "Fallback: Text already matches, no update needed")
             }
         }
     }
+    */
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -841,18 +881,36 @@ fun ChatScreen(
                 // Voice Input Button - Android Speech Recognition
                 IconButton(
                     onClick = {
+                        android.util.Log.d("ChatScreen", "Microphone button clicked - isListening: ${speechState.isListening}")
                         if (speechState.isListening) {
                             // Stop listening
+                            android.util.Log.d("ChatScreen", "Stopping listening...")
                             androidSpeechViewModel.stopListening()
                         } else {
                             // Check if speech recognition is available
+                            android.util.Log.d("ChatScreen", "Speech recognition available: ${speechState.isAvailable}")
                             if (!speechState.isAvailable) {
-                                // Speech recognition not available
+                                android.util.Log.w("ChatScreen", "Speech recognition not available")
                                 return@IconButton
                             }
                             // Start listening (don't clear transcription here to avoid interference)
-                            // Request audio permission and start listening
-                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            // Check if permission is already granted
+                            val hasPermission = ContextCompat.checkSelfPermission(
+                                context, 
+                                Manifest.permission.RECORD_AUDIO
+                            ) == PackageManager.PERMISSION_GRANTED
+                            
+                            android.util.Log.d("ChatScreen", "Has audio permission: $hasPermission")
+                            
+                            if (hasPermission) {
+                                // Permission already granted, start listening directly
+                                android.util.Log.d("ChatScreen", "Starting listening directly (permission already granted)...")
+                                androidSpeechViewModel.startListening()
+                            } else {
+                                // Request audio permission and start listening
+                                android.util.Log.d("ChatScreen", "Requesting audio permission...")
+                                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
                         }
                     },
                     enabled = if (speechState.isListening) true else speechState.isAvailable && !isLoading,

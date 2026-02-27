@@ -94,7 +94,7 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
         speechRecognizer?.setRecognitionListener(object : RecognitionListener {
             
             override fun onReadyForSpeech(params: Bundle?) {
-                Log.d(TAG, "Ready for speech")
+                Log.d(TAG, "onReadyForSpeech called")
                 viewModelScope.launch {
                     _speechState.value = _speechState.value.copy(
                         isListening = true,
@@ -102,6 +102,7 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
                         statusMessage = "Listening... Speak now",
                         error = null
                     )
+                    Log.d(TAG, "State after onReadyForSpeech: isListening=true, isProcessing=false")
                 }
             }
             
@@ -131,7 +132,7 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
             }
             
             override fun onEndOfSpeech() {
-                Log.d(TAG, "End of speech")
+                Log.d(TAG, "onEndOfSpeech called")
                 viewModelScope.launch {
                     _speechState.value = _speechState.value.copy(
                         isListening = false,
@@ -139,6 +140,7 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
                         statusMessage = "Processing speech...",
                         audioLevel = 0f
                     )
+                    Log.d(TAG, "State after onEndOfSpeech: isListening=false, isProcessing=true")
                 }
             }
             
@@ -176,8 +178,13 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 val transcription = matches?.firstOrNull() ?: ""
                 
-                Log.d(TAG, "Speech recognition results: '$transcription' (matches: ${matches?.size ?: 0})")
+                Log.d(TAG, "onResults called - transcription: '$transcription' (matches: ${matches?.size ?: 0})")
+                Log.d(TAG, "All matches: $matches")
+                
                 viewModelScope.launch {
+                    val oldState = _speechState.value
+                    Log.d(TAG, "State before onResults: isListening=${oldState.isListening}, isProcessing=${oldState.isProcessing}, transcribedText='${oldState.transcribedText}'")
+                    
                     _speechState.value = _speechState.value.copy(
                         isListening = false,
                         isProcessing = false,
@@ -190,7 +197,9 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
                         audioLevel = 0f,
                         error = null
                     )
-                    Log.d(TAG, "Updated speech state - transcribedText: '$transcription'")
+                    
+                    val newState = _speechState.value
+                    Log.d(TAG, "State after onResults: isListening=${newState.isListening}, isProcessing=${newState.isProcessing}, transcribedText='${newState.transcribedText}'")
                 }
             }
             
@@ -218,9 +227,12 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
      * Start listening for speech input
      */
     fun startListening() {
+        Log.d(TAG, "startListening() called")
         viewModelScope.launch {
             try {
+                Log.d(TAG, "Checking if speech recognition is available: ${_speechState.value.isAvailable}")
                 if (!_speechState.value.isAvailable) {
+                    Log.w(TAG, "Speech recognition not available")
                     _speechState.value = _speechState.value.copy(
                         error = "Speech recognition not available",
                         statusMessage = "Speech recognition service not available"
@@ -228,11 +240,13 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
                     return@launch
                 }
                 
+                Log.d(TAG, "Checking current state - isListening: ${_speechState.value.isListening}, isProcessing: ${_speechState.value.isProcessing}")
                 if (_speechState.value.isListening || _speechState.value.isProcessing) {
-                    Log.w(TAG, "Already listening or processing")
+                    Log.w(TAG, "Already listening or processing, skipping...")
                     return@launch
                 }
                 
+                Log.d(TAG, "Clearing previous results...")
                 // Clear previous results
                 _speechState.value = _speechState.value.copy(
                     transcribedText = "", // Clear old transcription
@@ -242,13 +256,16 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
                 )
                 
                 recognizerIntent?.let { intent ->
+                    Log.d(TAG, "Starting speech recognizer...")
                     speechRecognizer?.startListening(intent)
-                    Log.d(TAG, "Started listening for speech")
+                    Log.d(TAG, "Speech recognizer started successfully")
                 } ?: run {
+                    Log.e(TAG, "Recognition intent is null!")
                     _speechState.value = _speechState.value.copy(
                         error = "Recognition intent not configured",
                         statusMessage = "Failed to start listening"
                     )
+                }
                 }
                 
             } catch (e: Exception) {
