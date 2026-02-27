@@ -44,6 +44,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
+        <!-- Broadcast Receiver for medicine reminders -->
+        <receiver
+            android:name=".notification.AlarmReceiver"
+            android:exported="true"
+            android:permission="android.permission.SCHEDULE_EXACT_ALARM">
+            <intent-filter>
+                <action android:name="com.runanywhere.startup_hackathon20.MEDICINE_REMINDER" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

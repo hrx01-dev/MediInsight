@@ -1,12 +1,15 @@
 package com.runanywhere.startup_hackathon20.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.startup_hackathon20.database.MedicineDatabase
 import com.runanywhere.startup_hackathon20.database.MedicineEntity
 import com.runanywhere.startup_hackathon20.database.MedicineRepository
 import com.runanywhere.startup_hackathon20.database.UserRepository
+import com.runanywhere.startup_hackathon20.notification.NotificationHelper
+import com.runanywhere.startup_hackathon20.notification.ReminderScheduler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -38,6 +41,9 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         val userDao = database.userDao()
         repository = MedicineRepository(medicineDao)
         userRepository = UserRepository(userDao)
+        
+        // Create notification channel
+        NotificationHelper.createNotificationChannel(application)
 
         // Load current user
         viewModelScope.launch {
@@ -90,9 +96,27 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                     quantity = quantity,
                     instructions = instructions
                 )
-                repository.insertMedicine(medicine)
+                
+                // Insert medicine into database
+                val medicineId = repository.insertMedicine(medicine)
+                Log.d("MedicineViewModel", "Medicine inserted with ID: $medicineId")
+                
+                // Schedule reminder alarm
+                if (time.isNotBlank() && frequency.isNotBlank()) {
+                    ReminderScheduler.scheduleMedicineReminder(
+                        getApplication(),
+                        medicineId,
+                        name,
+                        dosage,
+                        instructions,
+                        time,
+                        frequency
+                    )
+                    Log.d("MedicineViewModel", "Reminder scheduled for: $name")
+                }
             } catch (e: Exception) {
                 _error.value = "Failed to add medicine: ${e.message}"
+                Log.e("MedicineViewModel", "Error inserting medicine: ${e.message}", e)
             } finally {
                 _isLoading.value = false
             }
@@ -118,9 +142,15 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             try {
                 _isLoading.value = true
                 _error.value = null
+                
+                // Cancel reminder alarm before deleting
+                ReminderScheduler.cancelMedicineReminder(getApplication(), medicine.id)
+                Log.d("MedicineViewModel", "Reminder cancelled for medicine ID: ${medicine.id}")
+                
                 repository.deleteMedicine(medicine)
             } catch (e: Exception) {
                 _error.value = "Failed to delete medicine: ${e.message}"
+                Log.e("MedicineViewModel", "Error deleting medicine: ${e.message}", e)
             } finally {
                 _isLoading.value = false
             }
