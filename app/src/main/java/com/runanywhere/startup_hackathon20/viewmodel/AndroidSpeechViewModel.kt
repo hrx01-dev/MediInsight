@@ -266,7 +266,6 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
                         statusMessage = "Failed to start listening"
                     )
                 }
-                }
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting speech recognition: ${e.message}", e)
