@@ -12,6 +12,5 @@ object Routes {
     const val Chat = "chat"
     const val MedicineScanner = "medicine_scanner"
     const val VoiceAssistant = "voice_assistant"
-    const val MedicineAnalysis = "medicine_analysis"
-    const val MedicineAnalysisResults = "medicine_analysis_results"
+
 }
