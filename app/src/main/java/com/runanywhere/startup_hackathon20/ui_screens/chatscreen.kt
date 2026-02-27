@@ -67,6 +67,9 @@ fun ChatScreen(
         if (isGranted) {
             // Permission granted, start recording
             voiceViewModel?.startRecording()
+        } else {
+            // Permission denied - show a message to user
+            // You could also show a dialog explaining why the permission is needed
         }
     }
     
@@ -101,10 +104,20 @@ fun ChatScreen(
             android.util.Log.d("ChatScreen", "Waiting for model - Verified: $isModelVerified, ModelID: $currentModelId, Status: $statusMessage")
         }
     }
+    
+    // Sync VoiceViewModel STT state with ChatViewModel model state
+    LaunchedEffect(isModelVerified, currentModelId) {
+        if (isModelVerified && currentModelId != null) {
+            // Model is loaded in ChatViewModel, enable STT in VoiceViewModel
+            voiceViewModel?.loadSTTModel(currentModelId)
+        }
+    }
     // Update input text when transcription is complete
     LaunchedEffect(voiceState.transcribedText) {
         if (voiceState.transcribedText.isNotEmpty() && !voiceState.isTranscribing) {
             inputText = TextFieldValue(voiceState.transcribedText)
+            // Clear the transcribed text to avoid duplicate entries on next recording
+            voiceViewModel?.clearTranscription()
         }
     }
 
@@ -826,6 +839,8 @@ fun ChatScreen(
                                 // Show message to load STT model first
                                 return@IconButton
                             }
+                            // Clear any previous transcription before starting new recording
+                            voiceViewModel?.clearTranscription()
                             // Request audio permission and start recording
                             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }

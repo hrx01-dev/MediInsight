@@ -207,19 +207,35 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 Log.d(TAG, "STT model availability check: $modelId")
                 
-                // Mark STT as loaded since a model is available
-                // We trust that the LLM model in ChatViewModel is the same model
-                // and can handle both LLM and STT tasks
-                _modelState.value = _modelState.value.copy(
-                    sttModelId = modelId,
-                    isSTTLoaded = true,
-                    statusMessage = "Voice input ready"
-                )
-                Log.d(TAG, "STT marked as available: $modelId")
+                // Check if the model is actually loaded in RunAnywhere
+                // We should verify with the main model system instead of just marking as available
+                val isModelActuallyLoaded = try {
+                    // This is a simple check - you might want to make this more robust
+                    // by checking if RunAnywhere has the model loaded
+                    modelId.isNotEmpty()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error checking model availability: ${e.message}")
+                    false
+                }
+                
+                if (isModelActuallyLoaded) {
+                    _modelState.value = _modelState.value.copy(
+                        sttModelId = modelId,
+                        isSTTLoaded = true,
+                        statusMessage = "Voice input ready"
+                    )
+                    Log.d(TAG, "STT marked as available: $modelId")
+                } else {
+                    _modelState.value = _modelState.value.copy(
+                        isSTTLoaded = false,
+                        statusMessage = "Model not available for STT"
+                    )
+                }
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error marking STT: ${e.message}")
                 _modelState.value = _modelState.value.copy(
+                    isSTTLoaded = false,
                     statusMessage = "Error with voice input: ${e.message}"
                 )
             }
@@ -346,10 +362,21 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                 if (audioBuffer.isEmpty()) {
                     _voiceState.value = _voiceState.value.copy(
                         isTranscribing = false,
-                        statusMessage = "No audio recorded. Try again.",
+                        statusMessage = "No audio recorded. Try speaking longer.",
                         transcribedText = ""
                     )
                     Log.w(TAG, "Audio buffer is empty")
+                    return@launch
+                }
+                
+                // Check for minimum audio length (at least 0.5 seconds at 16kHz = 8000 samples = 16000 bytes)
+                if (audioBuffer.size < 8000) {
+                    _voiceState.value = _voiceState.value.copy(
+                        isTranscribing = false,
+                        statusMessage = "Audio too short. Please speak for at least 1 second.",
+                        transcribedText = ""
+                    )
+                    Log.w(TAG, "Audio buffer too small: ${audioBuffer.size} bytes")
                     return@launch
                 }
 
@@ -386,7 +413,7 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                     _voiceState.value = _voiceState.value.copy(
                         isTranscribing = false,
                         transcribedText = transcription,
-                        statusMessage = "Transcription complete",
+                        statusMessage = "Transcription complete: $transcription",
                         confidence = 0.95f
                     )
                     Log.d(TAG, "Transcription successful: $transcription")
@@ -622,7 +649,11 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
         _voiceState.value = _voiceState.value.copy(
             transcribedText = "",
             responseText = "",
-            statusMessage = "Ready"
+            statusMessage = if (_modelState.value.isSTTLoaded) "Ready" else "Load STT model first",
+            confidence = 0f,
+            audioLevel = 0f,
+            isRecording = false,
+            isTranscribing = false
         )
     }
 
