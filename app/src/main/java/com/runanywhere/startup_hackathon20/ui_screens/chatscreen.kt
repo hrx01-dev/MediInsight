@@ -104,11 +104,31 @@ fun ChatScreen(
     }
     
     // Update input text when Android speech transcription is complete
-    LaunchedEffect(speechState.transcribedText) {
-        if (speechState.transcribedText.isNotEmpty() && !speechState.isListening && !speechState.isProcessing) {
+    LaunchedEffect(speechState.transcribedText, speechState.isListening, speechState.isProcessing) {
+        // Only update input text when we have transcription AND we're done processing
+        if (speechState.transcribedText.isNotEmpty() && 
+            !speechState.isListening && 
+            !speechState.isProcessing &&
+            speechState.error == null) {
+            
+            android.util.Log.d("ChatScreen", "Setting transcribed text: '${speechState.transcribedText}'")
             inputText = TextFieldValue(speechState.transcribedText)
-            // Clear the transcribed text to avoid duplicate entries on next recording
+            
+            // Delay before clearing to ensure text is set properly
+            kotlinx.coroutines.delay(500) // Increased delay to ensure UI update
             androidSpeechViewModel.clearTranscription()
+        }
+    }
+    
+    // Alternative approach: Monitor when processing completes with text
+    LaunchedEffect(speechState.isProcessing) {
+        // When processing changes from true to false, check if we have text
+        if (!speechState.isProcessing && speechState.transcribedText.isNotEmpty() && speechState.error == null) {
+            kotlinx.coroutines.delay(100) // Small delay to ensure state is stable
+            if (inputText.text != speechState.transcribedText) { // Only update if different
+                android.util.Log.d("ChatScreen", "Fallback: Setting transcribed text: '${speechState.transcribedText}'")
+                inputText = TextFieldValue(speechState.transcribedText)
+            }
         }
     }
 
@@ -830,8 +850,7 @@ fun ChatScreen(
                                 // Speech recognition not available
                                 return@IconButton
                             }
-                            // Clear any previous transcription before starting new listening
-                            androidSpeechViewModel.clearTranscription()
+                            // Start listening (don't clear transcription here to avoid interference)
                             // Request audio permission and start listening
                             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }

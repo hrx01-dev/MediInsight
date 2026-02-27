@@ -176,20 +176,21 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 val transcription = matches?.firstOrNull() ?: ""
                 
-                Log.d(TAG, "Speech recognition results: $transcription")
+                Log.d(TAG, "Speech recognition results: '$transcription' (matches: ${matches?.size ?: 0})")
                 viewModelScope.launch {
                     _speechState.value = _speechState.value.copy(
                         isListening = false,
                         isProcessing = false,
                         transcribedText = transcription,
                         statusMessage = if (transcription.isNotEmpty()) {
-                            "Speech recognized successfully"
+                            "Speech recognized: $transcription"
                         } else {
                             "No speech recognized"
                         },
                         audioLevel = 0f,
                         error = null
                     )
+                    Log.d(TAG, "Updated speech state - transcribedText: '$transcription'")
                 }
             }
             
@@ -234,7 +235,7 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
                 
                 // Clear previous results
                 _speechState.value = _speechState.value.copy(
-                    transcribedText = "",
+                    transcribedText = "", // Clear old transcription
                     error = null,
                     statusMessage = "Initializing...",
                     audioLevel = 0f
@@ -321,6 +322,7 @@ class AndroidSpeechViewModel(application: Application) : AndroidViewModel(applic
      * Clear the transcribed text
      */
     fun clearTranscription() {
+        Log.d(TAG, "Clearing transcription")
         _speechState.value = _speechState.value.copy(
             transcribedText = "",
             error = null,
