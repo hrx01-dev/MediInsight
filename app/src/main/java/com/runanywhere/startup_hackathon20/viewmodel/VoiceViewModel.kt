@@ -371,36 +371,50 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
 
                 // Transcribe the audio using the loaded STT model
                 val audioData = audioBuffer.toByteArray()
-                Log.d(TAG, "Starting transcription with ${audioData.size} bytes")
+                Log.d(TAG, "Starting transcription with ${audioData.size} bytes of audio")
                 
-                val transcription = try {
-                    // Use RunAnywhere.generate with special prompt to trigger STT if available
-                    // Or use transcribe if STT model is loaded
-                    val result = RunAnywhere.transcribe(audioData)
-                    if (result.isBlank()) {
-                        Log.w(TAG, "Transcription returned blank result")
-                        "No speech detected"
-                    } else {
-                        result.trim()
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Transcription error: ${e.message}", e)
-                    // Fallback: try to get from generate if transcribe fails
+                val transcription = withContext(Dispatchers.Default) {
                     try {
-                        RunAnywhere.generate("Transcribe audio")
-                    } catch (fallbackError: Exception) {
-                        Log.e(TAG, "Fallback transcription also failed: ${fallbackError.message}")
-                        throw e
+                        Log.d(TAG, "Attempting RunAnywhere.transcribe() with ${audioData.size} bytes")
+                        val result = RunAnywhere.transcribe(audioData)
+                        Log.d(TAG, "RunAnywhere.transcribe() returned: '${result.take(50)}...'")
+                        
+                        if (result.isBlank()) {
+                            Log.w(TAG, "RunAnywhere.transcribe returned blank, trying alternative method")
+                            // Try alternative: encode audio and use generate
+                            try {
+                                val audioHex = audioData.joinToString("") { "%02x".format(it) }
+                                val prompt = "Transcribe this audio data: $audioHex"
+                                val altResult = RunAnywhere.generate(prompt)
+                                Log.d(TAG, "Alternative transcription result: ${altResult.take(100)}")
+                                altResult.trim()
+                            } catch (altE: Exception) {
+                                Log.e(TAG, "Alternative transcription failed: ${altE.message}")
+                                "No speech detected"
+                            }
+                        } else {
+                            result.trim()
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "RunAnywhere.transcribe() error: ${e.message}", e)
+                        "Error processing audio: ${e.message}"
                     }
                 }
                 
-                if (transcription.isBlank()) {
+                if (transcription.isBlank() || transcription.contains("No speech", ignoreCase = true)) {
                     _voiceState.value = _voiceState.value.copy(
                         isTranscribing = false,
-                        statusMessage = "No speech detected. Try again.",
+                        statusMessage = "No speech detected. Try speaking louder and try again.",
                         transcribedText = ""
                     )
-                    Log.w(TAG, "Transcription result was blank")
+                    Log.w(TAG, "Transcription result was blank or no speech: $transcription")
+                } else if (transcription.contains("Error", ignoreCase = true)) {
+                    _voiceState.value = _voiceState.value.copy(
+                        isTranscribing = false,
+                        statusMessage = transcription,
+                        transcribedText = ""
+                    )
+                    Log.e(TAG, "Transcription error: $transcription")
                 } else {
                     _voiceState.value = _voiceState.value.copy(
                         isTranscribing = false,

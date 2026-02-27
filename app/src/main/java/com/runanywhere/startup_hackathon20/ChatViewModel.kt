@@ -225,14 +225,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun sendMessage(text: String) {
+        Log.d("ChatViewModel", "sendMessage called - ModelID: ${_currentModelId.value}, Verified: ${_isModelVerified.value}")
+        
         if (_currentModelId.value == null || !_isModelVerified.value) {
             _statusMessage.value = "Please wait for model to fully load, then try again"
+            Log.w("ChatViewModel", "Message not sent - Model not ready. ModelID: ${_currentModelId.value}, Verified: ${_isModelVerified.value}")
             return
         }
 
         val userId = _currentUserId.value
         if (userId == null) {
             _statusMessage.value = "No user logged in"
+            Log.w("ChatViewModel", "Message not sent - No user logged in")
             return
         }
 

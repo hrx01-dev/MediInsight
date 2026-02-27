@@ -88,7 +88,11 @@ fun ChatScreen(
     
     LaunchedEffect(presetMessage, isModelVerified, currentModelId) {
         android.util.Log.d("ChatScreen", "Preset check - Message: ${!presetMessage.isNullOrBlank()}, Verified: $isModelVerified, ModelID: $currentModelId, Sent: $presetMessageSent")
+        
+        // Only send if ALL conditions are met
         if (!presetMessage.isNullOrBlank() && isModelVerified && currentModelId != null && !presetMessageSent) {
+            // Add a small delay to ensure model is truly ready
+            kotlinx.coroutines.delay(500)
             android.util.Log.d("ChatScreen", "Sending preset message: $presetMessage")
             viewModel.sendMessage(presetMessage)
             presetMessageSent = true
