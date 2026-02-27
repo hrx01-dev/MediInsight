@@ -47,7 +47,7 @@ import java.util.concurrent.Executors
 @Composable
 fun MedicineScannerScreen(
     onBack: () -> Unit,
-    onUseCapturedText: (String) -> Unit = {},
+    onNavigateToChat: (String) -> Unit = {},
     scannerViewModel: ScannerViewModel = viewModel(),
     sharedViewModel: SharedMedicineViewModel = viewModel()
 ) {
@@ -140,11 +140,10 @@ fun MedicineScannerScreen(
                         error = error,
                         onToggleScanning = { scannerViewModel.toggleScanning() },
                         onClearHistory = { scannerViewModel.clearHistory() },
-                        onUseCapturedText = {
-                            // Set scanned text in shared ViewModel for AddMedicine screen
-                            sharedViewModel.setScannedText(detectedText)
-                            onUseCapturedText(detectedText)
-
+                        onAskAI = {
+                            // Send extracted text to chat with preset message
+                            val presetMessage = "I scanned a medicine label and found this information:\n\n$detectedText\n\nCan you help me understand this medicine?"
+                            onNavigateToChat(presetMessage)
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -324,7 +323,7 @@ private fun ResultsSection(
     error: String?,
     onToggleScanning: () -> Unit,
     onClearHistory: () -> Unit,
-    onUseCapturedText: () -> Unit,
+    onAskAI: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -408,7 +407,7 @@ private fun ResultsSection(
                 ) {
                     // Ask AI Button
                     Button(
-                        onClick = onUseCapturedText,
+                        onClick = onAskAI,
                         modifier = Modifier
                             .weight(1f)
                             .height(56.dp),

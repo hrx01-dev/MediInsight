@@ -222,18 +222,12 @@ fun AppNavGraph(
                 onBack = {
                     navController.popBackStack()
                 },
-                onUseCapturedText = { capturedText ->
-
-                    val presetPrompt =
-                        "Analyze this medicine and provide:\n" +
-                                "- Uses\n- Dosage\n- Side Effects\n- Precautions\n\n$capturedText"
-
+                onNavigateToChat = { presetMessage ->
                     navController.navigate(
-                        "chat?preset=${Uri.encode(presetPrompt)}"
+                        "chat?preset=${Uri.encode(presetMessage)}"
                     )
-                })
-                    // Navigate to Add Medicine screen with captured text
-
+                }
+            )
         }
 
         // Voice Assistant Screen
