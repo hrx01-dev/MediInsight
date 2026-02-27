@@ -69,6 +69,20 @@ fun ChatScreen(
             voiceViewModel?.startRecording()
         }
     }
+    
+    // Collect messages from ViewModel FIRST
+    val messages by (viewModel.messages.collectAsState())
+    val isLoading by (viewModel.isLoading.collectAsState())
+    val currentModelId by (viewModel.currentModelId
+        ).collectAsState()
+    val statusMessage by (viewModel.statusMessage
+       ).collectAsState()
+    val availableModels by (viewModel.availableModels
+         ).collectAsState()
+    val downloadProgress by (viewModel.downloadProgress
+         ).collectAsState()
+    val isModelVerified by (viewModel.isModelVerified ).collectAsState()
+    
     LaunchedEffect(presetMessage, isModelVerified) {
         if (!presetMessage.isNullOrBlank() && isModelVerified && messages.isEmpty()) {
             viewModel.sendMessage(presetMessage)
@@ -80,19 +94,6 @@ fun ChatScreen(
             inputText = TextFieldValue(voiceState.transcribedText)
         }
     }
-
-    // Collect messages from ViewModel
-    val messages by (viewModel.messages.collectAsState())
-    val isLoading by (viewModel.isLoading.collectAsState())
-    val currentModelId by (viewModel.currentModelId
-        ).collectAsState()
-    val statusMessage by (viewModel.statusMessage
-       ).collectAsState()
-    val availableModels by (viewModel.availableModels
-        ).collectAsState()
-    val downloadProgress by (viewModel.downloadProgress
-        ).collectAsState()
-    val isModelVerified by (viewModel.isModelVerified ).collectAsState()
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
