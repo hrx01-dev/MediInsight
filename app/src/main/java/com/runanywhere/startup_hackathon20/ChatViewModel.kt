@@ -1,6 +1,7 @@
 package com.runanywhere.startup_hackathon20
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
@@ -69,10 +70,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Try to auto-load a downloaded model if available
+        // Try to auto-load a downloaded model immediately and more aggressively
         viewModelScope.launch {
-            kotlinx.coroutines.delay(3000) // Wait longer for SDK initialization
+            kotlinx.coroutines.delay(1500) // Shorter delay for faster auto-load
             tryAutoLoadModel()
+        }
+        
+        // Secondary attempt with longer delay in case first fails
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(5000)
+            if (_currentModelId.value == null || !_isModelVerified.value) {
+                tryAutoLoadModel()
+            }
         }
     }
 
@@ -81,11 +90,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             // Check if we have any downloaded models
             val downloadedModel = _availableModels.value.firstOrNull { it.isDownloaded }
             if (downloadedModel != null && _currentModelId.value == null) {
-                _statusMessage.value = "Auto-loading previously downloaded model..."
+                _statusMessage.value = "Auto-loading model: ${downloadedModel.name}..."
                 loadModel(downloadedModel.id)
+            } else if (downloadedModel == null && _availableModels.value.isEmpty()) {
+                // Models might not be loaded yet, try refreshing
+                loadAvailableModels()
             }
         } catch (e: Exception) {
-            // Silently fail - user can manually load if needed
+            Log.e("ChatViewModel", "Auto-load failed: ${e.message}")
         }
     }
 

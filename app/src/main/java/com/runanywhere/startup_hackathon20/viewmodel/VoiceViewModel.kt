@@ -82,10 +82,10 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
     init {
         loadAvailableModels()
         
-        // Try to auto-load models if available
+        // Try to auto-load STT model if available
         viewModelScope.launch {
-            kotlinx.coroutines.delay(2000)
-            tryAutoLoadModels()
+            kotlinx.coroutines.delay(1000)
+            tryAutoLoadSTTModel()
         }
     }
 
@@ -95,8 +95,13 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                 val models = listAvailableModels()
                 _availableModels.value = models
                 _modelState.value = _modelState.value.copy(
-                    statusMessage = "Ready - Load models to start"
+                    statusMessage = "Loading STT model..."
                 )
+                // Auto-load STT model from the list
+                val sttModel = models.firstOrNull { it.isDownloaded }
+                if (sttModel != null && !_modelState.value.isSTTLoaded) {
+                    loadSTTModel(sttModel.id)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading models: ${e.message}")
                 _modelState.value = _modelState.value.copy(
@@ -106,18 +111,18 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun tryAutoLoadModels() {
+    private suspend fun tryAutoLoadSTTModel() {
         try {
             val downloadedModels = _availableModels.value.filter { it.isDownloaded }
             
-            // Try to load first downloaded model
+            // Try to load first downloaded model as STT
             val firstModel = downloadedModels.firstOrNull()
             
-            if (firstModel != null) {
-                loadLLMModel(firstModel.id)
+            if (firstModel != null && !_modelState.value.isSTTLoaded) {
+                loadSTTModel(firstModel.id)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Auto-load failed: ${e.message}")
+            Log.e(TAG, "Auto-load STT failed: ${e.message}")
         }
     }
 

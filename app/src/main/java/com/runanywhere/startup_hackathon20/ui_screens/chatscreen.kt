@@ -69,8 +69,8 @@ fun ChatScreen(
             voiceViewModel?.startRecording()
         }
     }
-    LaunchedEffect(presetMessage) {
-        if (!presetMessage.isNullOrBlank()) {
+    LaunchedEffect(presetMessage, isModelVerified) {
+        if (!presetMessage.isNullOrBlank() && isModelVerified && messages.isEmpty()) {
             viewModel.sendMessage(presetMessage)
         }
     }
@@ -244,7 +244,7 @@ fun ChatScreen(
         }
 
         // 🔥 MODEL SETUP BANNER (shown when no model is loaded)
-        if (currentModelId == null ) {
+        if (currentModelId == null && !isModelVerified) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
