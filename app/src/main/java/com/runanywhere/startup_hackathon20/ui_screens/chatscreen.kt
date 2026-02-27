@@ -53,8 +53,10 @@ fun ChatScreen(
     val context = LocalContext.current
 
     // Voice state from VoiceViewModel
-    val voiceState by (voiceViewModel?.voiceState ?: MutableStateFlow(com.runanywhere.startup_hackathon20.viewmodel.VoiceState())).collectAsState()
-    val modelState by (voiceViewModel?.modelState ?: MutableStateFlow(com.runanywhere.startup_hackathon20.viewmodel.ModelLoadingState())).collectAsState()
+    val voiceState by (voiceViewModel?.voiceState
+        ?: MutableStateFlow(com.runanywhere.startup_hackathon20.viewmodel.VoiceState())).collectAsState()
+    val modelState by (voiceViewModel?.modelState
+        ?: MutableStateFlow(com.runanywhere.startup_hackathon20.viewmodel.ModelLoadingState())).collectAsState()
 
     // Audio permission launcher
     val audioPermissionLauncher = rememberLauncherForActivityResult(
@@ -82,7 +84,8 @@ fun ChatScreen(
         ?: MutableStateFlow("Initializing...")).collectAsState()
     val availableModels by (viewModel?.availableModels
         ?: MutableStateFlow(emptyList())).collectAsState()
-    val downloadProgress by (viewModel?.downloadProgress ?: MutableStateFlow<Float?>(null)).collectAsState()
+    val downloadProgress by (viewModel?.downloadProgress
+        ?: MutableStateFlow<Float?>(null)).collectAsState()
     val isModelVerified by (viewModel?.isModelVerified ?: MutableStateFlow(false)).collectAsState()
 
     val listState = rememberLazyListState()
@@ -355,13 +358,13 @@ fun ChatScreen(
                                         )
                                         Spacer(Modifier.width(8.dp))
 
-                                    Text(    // Clear Chat Button
-                                        "Currently Loaded: ${availableModels.find { it.id == currentModelId }?.name ?: currentModelId}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF00796B)
+                                        Text(    // Clear Chat Button
+                                            "Currently Loaded: ${availableModels.find { it.id == currentModelId }?.name ?: currentModelId}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF00796B)
                                         )
-                                        }
+                                    }
                                 }
                             }
 
@@ -599,7 +602,8 @@ fun ChatScreen(
                                     ) {
                                         Text(
                                             suggestion,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 }
                             }
@@ -645,9 +649,9 @@ fun ChatScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (voiceState.isRecording) 
-                            Color(0xFFEF4444).copy(alpha = 0.1f) 
-                        else 
+                        containerColor = if (voiceState.isRecording)
+                            Color(0xFFEF4444).copy(alpha = 0.1f)
+                        else
                             MaterialTheme.colorScheme.primaryContainer
                     ),
                     shape = RoundedCornerShape(8.dp)
@@ -683,7 +687,7 @@ fun ChatScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        
+
                         // Audio level indicator (if recording)
                         if (voiceState.isRecording && voiceState.audioLevel > 0) {
                             Spacer(Modifier.weight(1f))
@@ -704,142 +708,143 @@ fun ChatScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = { inputText = it },
-                placeholder = { Text("Type your question...") },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant
+                OutlinedTextField(
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                    placeholder = { Text("Type your question...") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 )
-            )
 
-            Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(8.dp))
 
-            // Voice Input Button - RunAnywhere STT
-            IconButton(
-                onClick = {
-                    if (voiceState.isRecording) {
-                        // Stop recording and transcribe
-                        voiceViewModel?.stopRecordingAndTranscribe()
-                    } else {
-                        // Check if STT model is loaded
-                        if (!modelState.isSTTLoaded) {
-                            // Show message to load STT model first
-                            // You might want to add a Snackbar or Toast here
-                            return@IconButton
-                        }
-                        // Request audio permission and start recording
-                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    }
-                },
-                enabled = isModelVerified && !isLoading,
-                modifier = Modifier
-                    .size(50.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
+                // Voice Input Button - RunAnywhere STT
+                IconButton(
+                    onClick = {
                         if (voiceState.isRecording) {
-                            // Recording - red gradient
-                            Brush.linearGradient(
-                                listOf(Color(0xFFEF4444), Color(0xFFF87171))
-                            )
-                        } else if (isModelVerified && !isLoading) {
-                            // Ready - green/teal gradient
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.secondary,
-                                    MaterialTheme.colorScheme.tertiary
-                                )
-                            )
+                            // Stop recording and transcribe
+                            voiceViewModel?.stopRecordingAndTranscribe()
                         } else {
-                            // Disabled - gray
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            )
+                            // Check if STT model is loaded
+                            if (!modelState.isSTTLoaded) {
+                                // Show message to load STT model first
+                                // You might want to add a Snackbar or Toast here
+                                return@IconButton
+                            }
+                            // Request audio permission and start recording
+                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
-                    )
-            ) {
-                if (voiceState.isTranscribing) {
-                    // Show loading indicator while transcribing
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = if (voiceState.isRecording) Icons.Default.Stop else Icons.Default.Mic,
-                        contentDescription = if (voiceState.isRecording) "Stop Recording" else "Voice Input",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            Spacer(Modifier.width(8.dp))
-
-            IconButton(
-                onClick = {
-                    if (inputText.text.isNotBlank()) {
-                        viewModel?.sendMessage(inputText.text)
-                        inputText = TextFieldValue("")
+                    },
+                    enabled = isModelVerified && !isLoading,
+                    modifier = Modifier
+                        .size(50.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (voiceState.isRecording) {
+                                // Recording - red gradient
+                                Brush.linearGradient(
+                                    listOf(Color(0xFFEF4444), Color(0xFFF87171))
+                                )
+                            } else if (isModelVerified && !isLoading) {
+                                // Ready - green/teal gradient
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.secondary,
+                                        MaterialTheme.colorScheme.tertiary
+                                    )
+                                )
+                            } else {
+                                // Disabled - gray
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                )
+                            }
+                        )
+                ) {
+                    if (voiceState.isTranscribing) {
+                        // Show loading indicator while transcribing
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = if (voiceState.isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                            contentDescription = if (voiceState.isRecording) "Stop Recording" else "Voice Input",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
-                },
-                enabled = isModelVerified && !isLoading && inputText.text.isNotBlank(),
-                modifier = Modifier
-                    .size(50.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (isModelVerified && !isLoading && inputText.text.isNotBlank()) {
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.secondary
-                                )
-                            )
-                        } else {
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            )
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = {
+                        if (inputText.text.isNotBlank()) {
+                            viewModel?.sendMessage(inputText.text)
+                            inputText = TextFieldValue("")
                         }
-                    )
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_send),
-                        contentDescription = "Send",
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
+                    },
+                    enabled = isModelVerified && !isLoading && inputText.text.isNotBlank(),
+                    modifier = Modifier
+                        .size(50.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isModelVerified && !isLoading && inputText.text.isNotBlank()) {
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.secondary
+                                    )
+                                )
+                            } else {
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                )
+                            }
+                        )
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_send),
+                            contentDescription = "Send",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
                 }
             }
         }
     }
 }
+    @Preview(showBackground = true, showSystemUi = true)
+    @Composable
+    fun ChatScreenPreview() {
+        Startup_hackathon20Theme {
+            ChatScreen(onBack = {}, viewModel = null)
+        }
 
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun ChatScreenPreview() {
-    Startup_hackathon20Theme {
-        ChatScreen(onBack = {}, viewModel = null)
     }
-}
