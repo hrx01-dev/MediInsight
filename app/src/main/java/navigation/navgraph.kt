@@ -10,6 +10,9 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import android.net.Uri
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.runanywhere.startup_hackathon20.ui_screens.AddMedicineScreen
@@ -183,13 +186,24 @@ fun AppNavGraph(
 
         // Chat Screen - Slide up from bottom (modal)
         composable(
-            route = Routes.Chat,
+            route = Routes.ChatWithArg,
+            arguments = listOf(
+                navArgument("preset") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            ),
             enterTransition = { ScreenTransitions.slideUpFromBottomTransition().targetContentEnter },
             exitTransition = { ScreenTransitions.slideDownFromTopTransition().initialContentExit },
             popEnterTransition = { ScreenTransitions.slideDownFromTopTransition(duration = 400).targetContentEnter },
             popExitTransition = { ScreenTransitions.slideUpFromBottomTransition(duration = 400).initialContentExit }
-        ) {
+        ) {backStackEntry ->
+
+            val presetMessage =
+                backStackEntry.arguments?.getString("preset")
             ChatScreen(
+                presetMessage = presetMessage,
                 onBack = {
                     navController.popBackStack()
                 }
@@ -209,10 +223,17 @@ fun AppNavGraph(
                     navController.popBackStack()
                 },
                 onUseCapturedText = { capturedText ->
+
+                    val presetPrompt =
+                        "Analyze this medicine and provide:\n" +
+                                "- Uses\n- Dosage\n- Side Effects\n- Precautions\n\n$capturedText"
+
+                    navController.navigate(
+                        "chat?preset=${Uri.encode(presetPrompt)}"
+                    )
+                })
                     // Navigate to Add Medicine screen with captured text
-                    navController.navigate(Routes.AddMedicines)
-                }
-            )
+
         }
 
         // Voice Assistant Screen

@@ -10,6 +10,7 @@ object Routes {
     const val Settings = "settings"
     const val Notification = "notification"
     const val Chat = "chat"
+    const val ChatWithArg = "chat?preset={preset}"
     const val MedicineScanner = "medicine_scanner"
     const val VoiceAssistant = "voice_assistant"
 

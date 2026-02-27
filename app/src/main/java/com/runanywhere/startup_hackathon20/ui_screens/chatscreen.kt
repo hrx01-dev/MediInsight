@@ -44,18 +44,19 @@ data class Message(
 
 @Composable
 fun ChatScreen(
+    presetMessage: String? = null,
     onBack: () -> Unit,
-    viewModel: ChatViewModel? = viewModel(),
-    voiceViewModel: VoiceViewModel? = viewModel()
+    viewModel: ChatViewModel = viewModel(),
+    voiceViewModel: VoiceViewModel= viewModel()
 ) {
     var inputText by remember { mutableStateOf(TextFieldValue("")) }
     var showModelDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     // Voice state from VoiceViewModel
-    val voiceState by (voiceViewModel?.voiceState
+    val voiceState by (voiceViewModel.voiceState
         ?: MutableStateFlow(com.runanywhere.startup_hackathon20.viewmodel.VoiceState())).collectAsState()
-    val modelState by (voiceViewModel?.modelState
+    val modelState by (voiceViewModel.modelState
         ?: MutableStateFlow(com.runanywhere.startup_hackathon20.viewmodel.ModelLoadingState())).collectAsState()
 
     // Audio permission launcher
@@ -67,7 +68,11 @@ fun ChatScreen(
             voiceViewModel?.startRecording()
         }
     }
-
+    LaunchedEffect(presetMessage) {
+        if (!presetMessage.isNullOrBlank()) {
+            viewModel.sendMessage(presetMessage)
+        }
+    }
     // Update input text when transcription is complete
     LaunchedEffect(voiceState.transcribedText) {
         if (voiceState.transcribedText.isNotEmpty() && !voiceState.isTranscribing) {
@@ -76,17 +81,17 @@ fun ChatScreen(
     }
 
     // Collect messages from ViewModel
-    val messages by (viewModel?.messages ?: MutableStateFlow(emptyList())).collectAsState()
-    val isLoading by (viewModel?.isLoading ?: MutableStateFlow(false)).collectAsState()
-    val currentModelId by (viewModel?.currentModelId
-        ?: MutableStateFlow<String?>(null)).collectAsState()
-    val statusMessage by (viewModel?.statusMessage
-        ?: MutableStateFlow("Initializing...")).collectAsState()
-    val availableModels by (viewModel?.availableModels
-        ?: MutableStateFlow(emptyList())).collectAsState()
-    val downloadProgress by (viewModel?.downloadProgress
-        ?: MutableStateFlow<Float?>(null)).collectAsState()
-    val isModelVerified by (viewModel?.isModelVerified ?: MutableStateFlow(false)).collectAsState()
+    val messages by (viewModel.messages.collectAsState())
+    val isLoading by (viewModel.isLoading.collectAsState())
+    val currentModelId by (viewModel.currentModelId
+        ).collectAsState()
+    val statusMessage by (viewModel.statusMessage
+       ).collectAsState()
+    val availableModels by (viewModel.availableModels
+        ).collectAsState()
+    val downloadProgress by (viewModel.downloadProgress
+        ).collectAsState()
+    val isModelVerified by (viewModel.isModelVerified ).collectAsState()
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -238,7 +243,7 @@ fun ChatScreen(
         }
 
         // 🔥 MODEL SETUP BANNER (shown when no model is loaded)
-        if (currentModelId == null && viewModel != null) {
+        if (currentModelId == null ) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -301,7 +306,7 @@ fun ChatScreen(
         }
 
         // 🔥 MODEL SETUP DIALOG
-        if (showModelDialog && viewModel != null) {
+        if (showModelDialog ) {
             AlertDialog(
                 onDismissRequest = { showModelDialog = false },
                 title = {
@@ -844,7 +849,7 @@ fun ChatScreen(
     @Composable
     fun ChatScreenPreview() {
         Startup_hackathon20Theme {
-            ChatScreen(onBack = {}, viewModel = null)
+            ChatScreen(onBack = {})
         }
 
     }
