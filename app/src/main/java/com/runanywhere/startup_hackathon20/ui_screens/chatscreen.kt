@@ -249,7 +249,7 @@ fun ChatScreen(
         }
 
         // 🔥 MODEL SETUP BANNER (shown when no model is loaded)
-        if (currentModelId == null && !isModelVerified) {
+        if (currentModelId == null && !isModelVerified && !statusMessage.contains("Loading", ignoreCase = true) && !statusMessage.contains("Initializing", ignoreCase = true)) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -306,6 +306,39 @@ fun ChatScreen(
                             color = Color(0xFF92400E),
                             modifier = Modifier.padding(top = 4.dp)
                         )
+                    }
+                }
+            }
+        }
+        
+        // 🔥 MODEL LOADING BANNER (shown when model is being loaded)
+        if ((statusMessage.contains("Loading", ignoreCase = true) || statusMessage.contains("Initializing", ignoreCase = true) || statusMessage.contains("Testing", ignoreCase = true)) && !isModelVerified) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color(0xFF2196F3)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Preparing AI Model",
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1565C0)
+                            )
+                            Text(
+                                statusMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF1565C0)
+                            )
+                        }
                     }
                 }
             }

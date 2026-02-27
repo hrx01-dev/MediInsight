@@ -141,8 +141,19 @@ fun MedicineScannerScreen(
                         onToggleScanning = { scannerViewModel.toggleScanning() },
                         onClearHistory = { scannerViewModel.clearHistory() },
                         onAskAI = {
-                            // Send extracted text to chat with preset message
-                            val presetMessage = "I scanned a medicine label and found this information:\n\n$detectedText\n\nCan you help me understand this medicine?"
+                            // Send extracted text to chat with detailed preset message
+                            val presetMessage = """I scanned a medicine label with the following information:
+
+$detectedText
+
+Please provide detailed information about this medicine:
+- What is it used for?
+- What are the main uses and indications?
+- What precautions should be taken?
+- Any important warnings or contraindications?
+- Recommended dosage and usage instructions?
+
+Thank you!"""
                             onNavigateToChat(presetMessage)
                         },
                         modifier = Modifier
