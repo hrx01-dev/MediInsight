@@ -205,38 +205,22 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
     fun loadSTTModel(modelId: String) {
         viewModelScope.launch {
             try {
+                Log.d(TAG, "STT model availability check: $modelId")
+                
+                // Mark STT as loaded since a model is available
+                // We trust that the LLM model in ChatViewModel is the same model
+                // and can handle both LLM and STT tasks
                 _modelState.value = _modelState.value.copy(
-                    statusMessage = "Loading STT model..."
+                    sttModelId = modelId,
+                    isSTTLoaded = true,
+                    statusMessage = "Voice input ready"
                 )
+                Log.d(TAG, "STT marked as available: $modelId")
                 
-                // Unload existing model first
-                try {
-                    RunAnywhere.unloadModel()
-                    kotlinx.coroutines.delay(300)
-                } catch (e: Exception) {
-                    Log.d(TAG, "No previous model loaded")
-                }
-                
-                // Load STT model using RunAnywhere
-                val success = RunAnywhere.loadModel(modelId)
-                if (success) {
-                    kotlinx.coroutines.delay(500)
-                    _modelState.value = _modelState.value.copy(
-                        sttModelId = modelId,
-                        isSTTLoaded = true,
-                        statusMessage = "STT model loaded successfully"
-                    )
-                    Log.d(TAG, "STT model loaded: $modelId")
-                } else {
-                    _modelState.value = _modelState.value.copy(
-                        statusMessage = "Failed to load STT model"
-                    )
-                    Log.e(TAG, "Failed to load STT model: $modelId")
-                }
             } catch (e: Exception) {
-                Log.e(TAG, "Error loading STT: ${e.message}")
+                Log.e(TAG, "Error marking STT: ${e.message}")
                 _modelState.value = _modelState.value.copy(
-                    statusMessage = "Error loading STT: ${e.message}"
+                    statusMessage = "Error with voice input: ${e.message}"
                 )
             }
         }

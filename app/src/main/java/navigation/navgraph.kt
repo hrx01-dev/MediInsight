@@ -110,7 +110,23 @@ fun AppNavGraph(
 
         // Medical Insights Screen - Zoom in from home
         composable(
-            route = Routes.MedicalInsights + "?scannedText={scannedText}",
+            route = Routes.MedicalInsights,
+            enterTransition = { ScreenTransitions.zoomInTransition(duration = 500).targetContentEnter },
+            exitTransition = { ScreenTransitions.zoomOutTransition(duration = 400).initialContentExit },
+            popEnterTransition = { ScreenTransitions.zoomInTransition(duration = 400).targetContentEnter },
+            popExitTransition = { ScreenTransitions.zoomOutTransition(duration = 500).initialContentExit }
+        ) {
+            InsightsScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                scannedText = null
+            )
+        }
+        
+        // Medical Insights Screen with scanned text - Zoom in from scanner
+        composable(
+            route = "insights_with_scan?scannedText={scannedText}",
             arguments = listOf(
                 navArgument("scannedText") {
                     type = NavType.StringType
@@ -239,7 +255,7 @@ fun AppNavGraph(
                 onNavigateToInsights = { scannedText ->
                     // Navigate to insights screen and pass the scanned text
                     navController.navigate(
-                        "insights?scannedText=${Uri.encode(scannedText)}"
+                        "insights_with_scan?scannedText=${Uri.encode(scannedText)}"
                     )
                 }
             )
