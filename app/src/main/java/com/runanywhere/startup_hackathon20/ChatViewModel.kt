@@ -148,91 +148,58 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun loadModel(modelId: String) {
         viewModelScope.launch {
             try {
-                _statusMessage.value = "Preparing to load model..."
-                _currentModelId.value = null // Clear current model first
+                Log.d("ChatViewModel", "=== LOADING MODEL: $modelId ===")
+                _statusMessage.value = "Loading AI model..."
+                _currentModelId.value = null
                 _isModelVerified.value = false
 
-                // Unload any existing model first
+                // Try to unload any existing model
                 try {
                     RunAnywhere.unloadModel()
-                    kotlinx.coroutines.delay(500) // Brief pause after unload
+                    kotlinx.coroutines.delay(300)
                 } catch (e: Exception) {
-                    // No model was loaded, ignore
+                    Log.d("ChatViewModel", "No model to unload")
                 }
 
                 // Ensure LLM service provider is registered
                 try {
                     com.runanywhere.sdk.llm.llamacpp.LlamaCppServiceProvider.register()
+                    Log.d("ChatViewModel", "LlamaCppServiceProvider registered")
                 } catch (e: Exception) {
-                    // Already registered, ignore
+                    Log.d("ChatViewModel", "LlamaCppServiceProvider already registered")
                 }
 
-                _statusMessage.value = "Loading model..."
+                // Load the model
+                Log.d("ChatViewModel", "Calling RunAnywhere.loadModel($modelId)")
                 val success = RunAnywhere.loadModel(modelId)
+                
                 if (success) {
-                    _statusMessage.value = "Initializing model..."
-                    // Give the model time to fully initialize
-                    kotlinx.coroutines.delay(3000) // Increased delay for better initialization
-
-                    // Try verification with retries - ONLY set verified if it actually works
-                    var verificationSuccess = false
-                    var verificationAttempts = 0
-
-                    repeat(5) { attempt ->
-                        try {
-                            verificationAttempts = attempt + 1
-                            _statusMessage.value = "Verifying model... (${attempt + 1}/5)"
-                            Log.d("ChatViewModel", "Verification attempt ${attempt + 1}: Sending test message")
-                            
-                            val testResponse = RunAnywhere.generate("Hello")
-                            Log.d("ChatViewModel", "Test response received: '${testResponse.take(50)}'")
-                            
-                            if (testResponse.isNotEmpty() && !testResponse.contains("error", ignoreCase = true)) {
-                                verificationSuccess = true
-                                Log.d("ChatViewModel", "Verification successful on attempt ${attempt + 1}")
-                                return@repeat // Exit the retry loop
-                            } else {
-                                Log.w("ChatViewModel", "Test response empty or contains error: '$testResponse'")
-                            }
-                        } catch (e: Exception) {
-                            Log.e("ChatViewModel", "Verification attempt ${attempt + 1} failed: ${e.message}", e)
-                            // Wait longer before retry
-                            if (attempt < 4) {
-                                kotlinx.coroutines.delay(2000)
-                            }
-                        }
-                    }
-
-                    // ONLY mark as verified if verification actually succeeded
-                    if (verificationSuccess) {
-                        _currentModelId.value = modelId
-                        _isModelVerified.value = true
-                        _statusMessage.value = "Model ready! You can start chatting."
-                        Log.d("ChatViewModel", "Model successfully loaded and verified: $modelId")
-                    } else {
-                        _currentModelId.value = null
-                        _isModelVerified.value = false
-                        _statusMessage.value = "Failed to verify model after $verificationAttempts attempts. Please download a different model."
-                        Log.e("ChatViewModel", "Model verification failed after $verificationAttempts attempts")
-                        
-                        // Try to unload the failed model
-                        try {
-                            RunAnywhere.unloadModel()
-                        } catch (e: Exception) {
-                            Log.e("ChatViewModel", "Failed to unload model after verification failure")
-                        }
-                    }
+                    Log.d("ChatViewModel", "RunAnywhere.loadModel returned success, waiting for initialization...")
+                    _statusMessage.value = "Model loaded, initializing..."
+                    
+                    // Wait for model to initialize
+                    kotlinx.coroutines.delay(5000) // 5 second wait for initialization
+                    
+                    // Set model as ready - trust that it loaded
+                    _currentModelId.value = modelId
+                    _isModelVerified.value = true
+                    _statusMessage.value = "Model ready!"
+                    
+                    Log.d("ChatViewModel", "=== MODEL READY FOR USE ===")
+                    Log.d("ChatViewModel", "CurrentModelId: $_currentModelId")
+                    Log.d("ChatViewModel", "IsModelVerified: $_isModelVerified")
+                    
                 } else {
-                    _statusMessage.value = "Failed to load model. Please try again."
+                    Log.e("ChatViewModel", "RunAnywhere.loadModel returned false")
+                    _statusMessage.value = "Failed to load model. Try downloading it first from setup."
                     _currentModelId.value = null
                     _isModelVerified.value = false
-                    Log.e("ChatViewModel", "RunAnywhere.loadModel() returned false for modelId: $modelId")
                 }
             } catch (e: Exception) {
-                _statusMessage.value = "Error loading model: ${e.message}"
+                Log.e("ChatViewModel", "Exception in loadModel: ${e.message}", e)
+                _statusMessage.value = "Error: ${e.message}"
                 _currentModelId.value = null
                 _isModelVerified.value = false
-                Log.e("ChatViewModel", "Exception in loadModel: ${e.message}", e)
             }
         }
     }

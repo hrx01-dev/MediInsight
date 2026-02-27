@@ -369,52 +369,35 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                // Transcribe the audio using the loaded STT model
+                // Transcribe using RunAnywhere - simplified approach
                 val audioData = audioBuffer.toByteArray()
                 Log.d(TAG, "Starting transcription with ${audioData.size} bytes of audio")
                 
-                val transcription = withContext(Dispatchers.Default) {
-                    try {
-                        Log.d(TAG, "Attempting RunAnywhere.transcribe() with ${audioData.size} bytes")
-                        val result = RunAnywhere.transcribe(audioData)
-                        Log.d(TAG, "RunAnywhere.transcribe() returned: '${result.take(50)}...'")
-                        
-                        if (result.isBlank()) {
-                            Log.w(TAG, "RunAnywhere.transcribe returned blank, trying alternative method")
-                            // Try alternative: encode audio and use generate
-                            try {
-                                val audioHex = audioData.joinToString("") { "%02x".format(it) }
-                                val prompt = "Transcribe this audio data: $audioHex"
-                                val altResult = RunAnywhere.generate(prompt)
-                                Log.d(TAG, "Alternative transcription result: ${altResult.take(100)}")
-                                altResult.trim()
-                            } catch (altE: Exception) {
-                                Log.e(TAG, "Alternative transcription failed: ${altE.message}")
-                                "No speech detected"
-                            }
-                        } else {
-                            result.trim()
+                val transcription = try {
+                    Log.d(TAG, "Calling RunAnywhere.transcribe() with audio data")
+                    val result = RunAnywhere.transcribe(audioData)
+                    Log.d(TAG, "RunAnywhere.transcribe() returned: '$result'")
+                    
+                    when {
+                        result.isNotEmpty() && !result.contains("error", ignoreCase = true) -> result.trim()
+                        else -> {
+                            Log.w(TAG, "Transcription returned empty or error: '$result'")
+                            ""
                         }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "RunAnywhere.transcribe() error: ${e.message}", e)
-                        "Error processing audio: ${e.message}"
                     }
+                } catch (e: Exception) {
+                    Log.e(TAG, "RunAnywhere.transcribe() exception: ${e.message}", e)
+                    ""
                 }
                 
-                if (transcription.isBlank() || transcription.contains("No speech", ignoreCase = true)) {
+                // Update UI with result
+                if (transcription.isBlank()) {
                     _voiceState.value = _voiceState.value.copy(
                         isTranscribing = false,
-                        statusMessage = "No speech detected. Try speaking louder and try again.",
+                        statusMessage = "Unable to transcribe audio. Please try again.",
                         transcribedText = ""
                     )
-                    Log.w(TAG, "Transcription result was blank or no speech: $transcription")
-                } else if (transcription.contains("Error", ignoreCase = true)) {
-                    _voiceState.value = _voiceState.value.copy(
-                        isTranscribing = false,
-                        statusMessage = transcription,
-                        transcribedText = ""
-                    )
-                    Log.e(TAG, "Transcription error: $transcription")
+                    Log.w(TAG, "Transcription was empty")
                 } else {
                     _voiceState.value = _voiceState.value.copy(
                         isTranscribing = false,

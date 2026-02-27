@@ -91,13 +91,14 @@ fun ChatScreen(
         
         // Only send if ALL conditions are met
         if (!presetMessage.isNullOrBlank() && isModelVerified && currentModelId != null && !presetMessageSent) {
-            // Add a small delay to ensure model is truly ready
-            kotlinx.coroutines.delay(500)
-            android.util.Log.d("ChatScreen", "Sending preset message: $presetMessage")
+            // Wait to ensure model is fully ready
+            android.util.Log.d("ChatScreen", "Model verified, waiting 2 seconds before sending preset...")
+            kotlinx.coroutines.delay(2000)
+            android.util.Log.d("ChatScreen", "Sending preset message: ${presetMessage.take(50)}...")
             viewModel.sendMessage(presetMessage)
             presetMessageSent = true
         } else if (!presetMessage.isNullOrBlank() && !presetMessageSent) {
-            android.util.Log.d("ChatScreen", "Waiting for model - Verified: $isModelVerified, ModelID: $currentModelId")
+            android.util.Log.d("ChatScreen", "Waiting for model - Verified: $isModelVerified, ModelID: $currentModelId, Status: $statusMessage")
         }
     }
     // Update input text when transcription is complete
