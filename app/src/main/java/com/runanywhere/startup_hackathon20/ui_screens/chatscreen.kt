@@ -703,45 +703,42 @@ fun ChatScreen(
                                 color = Color(0xFFEF4444),
                             )
                         }
-                    }
-                }
-            }
-            
-            // STT model status warning
-            if (!voiceState.isRecording && !voiceState.isTranscribing && !modelState.isSTTLoaded) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFFEF3C7)
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = Color(0xFFF59E0B),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "Load an STT model to use voice input",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF92400E)
-                        )
-                    }
-                }
-            }
-                    }
-                }
-            }
+                     }
+                 }
+             }
+             
+             // STT model status warning
+             if (!voiceState.isRecording && !voiceState.isTranscribing && !modelState.isSTTLoaded) {
+                 Card(
+                     modifier = Modifier
+                         .fillMaxWidth()
+                         .padding(horizontal = 10.dp, vertical = 4.dp),
+                     colors = CardDefaults.cardColors(
+                         containerColor = Color(0xFFFEF3C7)
+                     ),
+                     shape = RoundedCornerShape(8.dp)
+                 ) {
+                     Row(
+                         modifier = Modifier
+                             .fillMaxWidth()
+                             .padding(8.dp),
+                         verticalAlignment = Alignment.CenterVertically
+                     ) {
+                         Icon(
+                             Icons.Default.Warning,
+                             contentDescription = null,
+                             tint = Color(0xFFF59E0B),
+                             modifier = Modifier.size(16.dp)
+                         )
+                         Spacer(Modifier.width(8.dp))
+                         Text(
+                             "Load an STT model to use voice input",
+                             style = MaterialTheme.typography.bodySmall,
+                             color = Color(0xFF92400E)
+                         )
+                     }
+                 }
+             }
 
             Row(
                 modifier = Modifier
