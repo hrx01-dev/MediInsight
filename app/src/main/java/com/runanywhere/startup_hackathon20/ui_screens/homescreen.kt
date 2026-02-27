@@ -169,7 +169,7 @@ fun HomeScreen(
                                 "Add Medicine" -> "addMedicine"
                                 "Insights" -> "insights"
                                 "Scan" -> "scanner"
-                                "AI Analysis" -> "analysis"
+
                                 else -> ""
                             }
                         )

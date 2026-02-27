@@ -144,7 +144,7 @@ fun MedicineScannerScreen(
                             // Set scanned text in shared ViewModel for AddMedicine screen
                             sharedViewModel.setScannedText(detectedText)
                             onUseCapturedText(detectedText)
-                            onBack()
+
                         },
                         modifier = Modifier
                             .fillMaxWidth()
