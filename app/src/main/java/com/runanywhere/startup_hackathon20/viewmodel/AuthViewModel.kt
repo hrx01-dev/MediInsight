@@ -76,8 +76,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         repository.registerUser(name, username, password)
                         _authSuccess.value = true
                         
-                        // Send welcome notification
-                        sendWelcomeNotification(name)
+                        // Note: Welcome notification will be sent after permission is granted
+                        // from the UI layer (authscreen.kt)
                     } catch (e: Exception) {
                         _errorMessage.value = "Registration failed: ${e.message}"
                     }
@@ -122,6 +122,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearError() {
         _errorMessage.value = null
+    }
+    
+    // Public function to send welcome notification (called after permission is granted)
+    fun sendWelcomeNotificationNow(userName: String) {
+        sendWelcomeNotification(userName)
     }
     
     private fun sendWelcomeNotification(userName: String) {

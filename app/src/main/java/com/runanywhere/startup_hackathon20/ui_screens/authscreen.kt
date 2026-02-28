@@ -1,5 +1,9 @@
 package com.runanywhere.startup_hackathon20.ui_screens
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -15,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -30,19 +35,37 @@ fun AuthScreen(
     onComplete: () -> Unit,
     viewModel: AuthViewModel? = viewModel()
 ) {
+    val context = LocalContext.current
     var activeTab by remember { mutableStateOf("login") }
     var name by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var justSignedUp by remember { mutableStateOf(false) }
+    var signupUserName by remember { mutableStateOf("") }
 
     val isLoading by (viewModel?.isLoading ?: MutableStateFlow(false)).collectAsState()
     val errorMessage by (viewModel?.errorMessage ?: MutableStateFlow<String?>(null)).collectAsState()
     val authSuccess by (viewModel?.authSuccess ?: MutableStateFlow(false)).collectAsState()
 
+    // Notification permission launcher (for Android 13+)
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        android.util.Log.d("AuthScreen", "Notification permission granted: $isGranted")
+        if (isGranted && justSignedUp && signupUserName.isNotEmpty()) {
+            // Send welcome notification now that permission is granted
+            viewModel?.sendWelcomeNotificationNow(signupUserName)
+        }
+    }
+
     // Navigate when auth is successful
     LaunchedEffect(authSuccess) {
         if (authSuccess) {
+            // Request notification permission on Android 13+ after signup
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && justSignedUp) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
             onComplete()
         }
     }
@@ -155,8 +178,11 @@ fun AuthScreen(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = {
                             if (activeTab == "login") {
+                                justSignedUp = false
                                 viewModel?.login(username, password)
                             } else {
+                                justSignedUp = true
+                                signupUserName = name
                                 viewModel?.register(name, username, password, confirmPassword)
                             }
                         },

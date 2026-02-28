@@ -1,13 +1,16 @@
 package com.runanywhere.startup_hackathon20.notification
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.runanywhere.startup_hackathon20.MainActivity
 import com.runanywhere.startup_hackathon20.R
 
@@ -78,6 +81,19 @@ object NotificationHelper {
         userName: String
     ) {
         Log.d(TAG, "Sending welcome notification for: $userName")
+        
+        // Check notification permission on Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            if (!hasPermission) {
+                Log.w(TAG, "Notification permission not granted, cannot send welcome notification")
+                return
+            }
+        }
         
         createNotificationChannel(context)
 
