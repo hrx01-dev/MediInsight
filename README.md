@@ -6,16 +6,20 @@ Extracts medicine name and details from packaging
 🧠 On-Device LLM Reasoning
 Generates contextual explanations
 Answers natural language questions
+
 📱 Offline Functionality
 No internet required
 Privacy-preserving architecture
+
 ✍️ Manual Medicine Entry
 Allows user correction in case of OCR errors
+
 👵 Elder-Friendly Design
 Simple UI
 Large readable fonts
+
 🏗 System Architecture
-Copy code
+
 
 Camera
    ↓
@@ -24,12 +28,15 @@ OCR Module (Text Extraction)
 On-Device LLM (Reasoning & Explanation)
    ↓
 User-Friendly Insight Output
+
 Components:
 Frontend: Android (Kotlin / Jetpack Compose)
 OCR Engine: (e.g., ML Kit / Tesseract)
 LLM Engine: On-device quantized Large Language Model
 Inference: Edge-based local processing
-#🧠 Why LLM Instead of a Relational Database?
+
+
+🧠 Why LLM Instead of a Relational Database?
 Traditional relational databases:
 Store structured medicine data
 Perform deterministic lookups
@@ -41,6 +48,7 @@ It handles incomplete OCR text
 It performs contextual reasoning
 It adapts language for elderly users
 This enables dynamic interaction rather than static data retrieval.
+
 🔒 Privacy & Edge AI
 All processing happens locally on the device:
 No prescription data is sent to the cloud
@@ -48,10 +56,12 @@ No external API dependency
 Reduced latency
 Enhanced data privacy
 This makes the system suitable for sensitive healthcare scenarios.
+
 ⚠ Medical Disclaimer
 MediInsight provides informational assistance only.
 It does not replace professional medical advice.
 Users are advised to consult qualified healthcare professionals for medical decisions.
+
 📊 Future Improvements
 Drug interaction detection
 Structured medical database validation (Hybrid RAG approach)
