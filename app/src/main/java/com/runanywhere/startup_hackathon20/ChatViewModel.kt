@@ -234,28 +234,51 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             _isLoading.value = true
 
             try {
-                // Build conversation context from last 10-15 messages
+                // Build conversation context with smart limiting
                 val currentMessages = _messages.value
-                val contextMessages = currentMessages.takeLast(15) // Get last 15 messages (excluding the one we just added)
+                val isLongMessage = text.length > 500 // Check if current message is very long (like scanned medicine)
                 
-                // Build prompt with conversation history
+                // For long messages (scanned text), limit context to last 4 messages
+                // For normal messages, use last 10 messages
+                val maxContextMessages = if (isLongMessage) 4 else 10
+                val maxContextChars = if (isLongMessage) 800 else 2000 // Limit total context size
+                
+                val contextMessages = currentMessages.takeLast(maxContextMessages)
+                
+                // Build prompt with conversation history, respecting character limits
                 val contextPrompt = buildString {
                     if (contextMessages.isNotEmpty()) {
-                        append("Previous conversation:\n")
-                        contextMessages.forEach { msg ->
-                            if (msg.isUser) {
-                                append("User: ${msg.text}\n")
+                        var contextCharsUsed = 0
+                        val relevantMessages = mutableListOf<ChatMessage>()
+                        
+                        // Collect messages until we hit the character limit (reverse order)
+                        for (msg in contextMessages.reversed()) {
+                            val msgLength = msg.text.length + 20 // +20 for "User: " or "Assistant: " prefix
+                            if (contextCharsUsed + msgLength <= maxContextChars) {
+                                relevantMessages.add(0, msg) // Add to front to maintain order
+                                contextCharsUsed += msgLength
                             } else {
-                                append("Assistant: ${msg.text}\n")
+                                break // Stop if we exceed limit
                             }
                         }
-                        append("\n")
+                        
+                        if (relevantMessages.isNotEmpty()) {
+                            append("Previous conversation:\n")
+                            relevantMessages.forEach { msg ->
+                                if (msg.isUser) {
+                                    append("User: ${msg.text}\n")
+                                } else {
+                                    append("Assistant: ${msg.text}\n")
+                                }
+                            }
+                            append("\n")
+                        }
                     }
                     append("User: $text\n")
                     append("Assistant:")
                 }
                 
-                Log.d("ChatViewModel", "Sending prompt with context: ${contextMessages.size} previous messages")
+                Log.d("ChatViewModel", "Sending prompt - Message length: ${text.length}, Context messages: ${contextMessages.size}, Total prompt length: ${contextPrompt.length}")
                 
                 // Generate response with streaming
                 var assistantResponse = ""
