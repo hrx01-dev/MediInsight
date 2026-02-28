@@ -72,4 +72,42 @@ object NotificationHelper {
         notificationManager.notify(notificationId, builder.build())
         Log.d(TAG, "Notification sent with ID: $notificationId")
     }
+    
+    fun sendWelcomeNotification(
+        context: Context,
+        userName: String
+    ) {
+        Log.d(TAG, "Sending welcome notification for: $userName")
+        
+        createNotificationChannel(context)
+
+        // Create intent to open app when notification is tapped
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+
+        val pendingIntent: PendingIntent = PendingIntent.getActivity(
+            context, 
+            1000, // Fixed ID for welcome notification
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_lightbulb)
+            .setContentTitle("Welcome to MediInsight! 👋")
+            .setContentText("Hello $userName, we're glad to have you here!")
+            .setStyle(NotificationCompat.BigTextStyle()
+                .bigText("Hello $userName! 👋\n\nWelcome to MediInsight - your personal medication management assistant.\n\nStart by adding your medications to get personalized reminders and health tips. Stay healthy! 💊"))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVibrate(longArrayOf(0, 500, 200, 500))
+            .setLights(android.graphics.Color.GREEN, 1000, 2000)
+
+        val notificationManager: NotificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(1000, builder.build())
+        Log.d(TAG, "Welcome notification sent")
+    }
 }

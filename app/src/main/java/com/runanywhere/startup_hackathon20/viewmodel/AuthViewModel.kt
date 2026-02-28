@@ -1,16 +1,19 @@
 package com.runanywhere.startup_hackathon20.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.startup_hackathon20.database.MedicineDatabase
 import com.runanywhere.startup_hackathon20.database.UserRepository
+import com.runanywhere.startup_hackathon20.notification.NotificationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val context: Context = application.applicationContext
     private val repository: UserRepository
 
     private val _isLoading = MutableStateFlow(false)
@@ -27,6 +30,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val userDao = database.userDao()
         repository = UserRepository(userDao)
 
+        // Create notification channel
+        NotificationHelper.createNotificationChannel(context)
+        
         checkExistingUser()
     }
 
@@ -69,6 +75,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     try {
                         repository.registerUser(name, username, password)
                         _authSuccess.value = true
+                        
+                        // Send welcome notification
+                        sendWelcomeNotification(name)
                     } catch (e: Exception) {
                         _errorMessage.value = "Registration failed: ${e.message}"
                     }
@@ -113,5 +122,13 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearError() {
         _errorMessage.value = null
+    }
+    
+    private fun sendWelcomeNotification(userName: String) {
+        // Send a welcome notification to the user's device
+        NotificationHelper.sendWelcomeNotification(
+            context = context,
+            userName = userName
+        )
     }
 }
