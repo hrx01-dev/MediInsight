@@ -360,6 +360,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     _statusMessage.value = "Model not responding. Try clearing chat or reloading model."
                     _currentModelId.value = null // Reset model state
                     _isModelVerified.value = false
+                } else {
+                    // Response completed - check if this was a medicine scan (first message)
+                    if (hasNoContext && text.contains("Medicine:", ignoreCase = true)) {
+                        // Add helpful follow-up suggestions after medicine scan
+                        kotlinx.coroutines.delay(500) // Small delay for better UX
+                        val suggestionEntity = ChatMessageEntity(
+                            userId = userId,
+                            text = "💡 You can ask me:\n• What are the side effects?\n• What precautions should I take?\n• What is the dosage?\n• Any drug interactions?",
+                            isUser = false,
+                            timestamp = assistantTimestamp + 2
+                        )
+                        repository.insertMessage(suggestionEntity, userId)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "Exception during message generation: ${e.message}", e)
