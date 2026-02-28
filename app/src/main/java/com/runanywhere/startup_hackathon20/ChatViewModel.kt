@@ -243,9 +243,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     // Has context - apply smart truncation
                     // Smart context limits based on current message length
-                    val maxContextMessages = if (isLongMessage) 2 else 6
-                    val maxTotalContextChars = 2000 // Maximum total characters for all context
-                    val maxSingleMessageChars = 400 // Maximum characters per individual context message
+                    // Support up to 10 conversation turns (20 messages = 10 user + 10 assistant)
+                    val maxContextMessages = if (isLongMessage) 6 else 20
+                    val maxTotalContextChars = 3000 // Increased to support more conversation
+                    val maxSingleMessageChars = 500 // Maximum characters per individual context message
                     
                     val contextMessages = currentMessages.takeLast(maxContextMessages)
                     
@@ -257,8 +258,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             
                             // Process messages from newest to oldest
                             for ((index, msg) in contextMessages.reversed().withIndex()) {
-                                // For the most recent pair (user + assistant), keep more text
-                                val charLimitForThisMsg = if (index < 2) maxSingleMessageChars else 200
+                                // For the most recent 4 messages (2 pairs), keep more text
+                                // For older messages, use more aggressive truncation
+                                val charLimitForThisMsg = when {
+                                    index < 4 -> maxSingleMessageChars // Recent messages: full 500 chars
+                                    index < 10 -> 300 // Middle messages: 300 chars
+                                    else -> 200 // Old messages: 200 chars
+                                }
                                 
                                 // Truncate very long messages but keep recent context
                                 val truncatedText = if (msg.text.length > charLimitForThisMsg) {
