@@ -222,6 +222,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             _isLoading.value = true
+            
+            // Generate timestamp at the start so it's available in both try and catch blocks
+            val userTimestamp = System.currentTimeMillis()
 
             try {
                 // Build conversation context with smart limiting BEFORE saving the new message
@@ -273,7 +276,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 Log.d("ChatViewModel", "Prompt preview: ${contextPrompt.take(200)}...")
                 
                 // Save user message to database AFTER building context
-                val userTimestamp = System.currentTimeMillis()
                 val userMessageEntity = ChatMessageEntity(
                     userId = userId,
                     text = text,
