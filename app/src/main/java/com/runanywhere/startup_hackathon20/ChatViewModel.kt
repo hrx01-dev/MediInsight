@@ -232,37 +232,48 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val currentMessages = _messages.value
                 val isLongMessage = text.length > 500 // Check if current message is very long (like scanned medicine)
                 
-                // For long messages (scanned text), limit context to last 4 messages
-                // For normal messages, use last 10 messages
-                val maxContextMessages = if (isLongMessage) 3 else 10
-                val maxContextChars = if (isLongMessage) 500 else 2000 // Limit total context size
+                // Smart context limits based on current message length
+                val maxContextMessages = if (isLongMessage) 2 else 8
+                val maxTotalContextChars = 1500 // Maximum total characters for all context
+                val maxSingleMessageChars = 300 // Maximum characters per individual context message
                 
                 val contextMessages = currentMessages.takeLast(maxContextMessages)
                 
-                // Build prompt with conversation history, respecting character limits
+                // Build prompt with conversation history, truncating long messages
                 val contextPrompt = buildString {
                     if (contextMessages.isNotEmpty()) {
                         var contextCharsUsed = 0
-                        val relevantMessages = mutableListOf<ChatMessage>()
+                        val relevantMessages = mutableListOf<Pair<ChatMessage, String>>()
                         
-                        // Collect messages until we hit the character limit (reverse order)
+                        // Process messages from newest to oldest
                         for (msg in contextMessages.reversed()) {
-                            val msgLength = msg.text.length + 20 // +20 for "User: " or "Assistant: " prefix
-                            if (contextCharsUsed + msgLength <= maxContextChars) {
-                                relevantMessages.add(0, msg) // Add to front to maintain order
+                            // Truncate very long messages but keep recent context
+                            val truncatedText = if (msg.text.length > maxSingleMessageChars) {
+                                // For long messages, take beginning and add ellipsis
+                                msg.text.take(maxSingleMessageChars) + "... [truncated]"
+                            } else {
+                                msg.text
+                            }
+                            
+                            val msgLength = truncatedText.length + 20 // +20 for "User: " or "Assistant: " prefix
+                            
+                            // Only add if we haven't exceeded total context limit
+                            if (contextCharsUsed + msgLength <= maxTotalContextChars) {
+                                relevantMessages.add(0, Pair(msg, truncatedText)) // Add to front to maintain order
                                 contextCharsUsed += msgLength
                             } else {
-                                break // Stop if we exceed limit
+                                // Stop adding more context if we're at limit
+                                break
                             }
                         }
                         
                         if (relevantMessages.isNotEmpty()) {
                             append("Previous conversation:\n")
-                            relevantMessages.forEach { msg ->
+                            relevantMessages.forEach { (msg, truncatedText) ->
                                 if (msg.isUser) {
-                                    append("User: ${msg.text}\n")
+                                    append("User: $truncatedText\n")
                                 } else {
-                                    append("Assistant: ${msg.text}\n")
+                                    append("Assistant: $truncatedText\n")
                                 }
                             }
                             append("\n")
