@@ -347,7 +347,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                // If response is empty, something went wrong
+                // Check if response completed successfully
                 if (assistantResponse.isEmpty()) {
                     Log.e("ChatViewModel", "Empty response received from model - ModelID: $_currentModelId, Prompt length: ${contextPrompt.length}")
                     val errorEntity = ChatMessageEntity(

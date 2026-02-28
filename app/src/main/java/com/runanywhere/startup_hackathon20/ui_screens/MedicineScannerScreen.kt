@@ -142,19 +142,11 @@ fun MedicineScannerScreen(
                         onToggleScanning = { scannerViewModel.toggleScanning() },
                         onClearHistory = { scannerViewModel.clearHistory() },
                         onAskAI = {
-                            // Send extracted text to chat with detailed preset message
-                            val presetMessage = """I scanned a medicine label with the following information:
+                            // Send extracted text to chat with concise preset message
+                            // Optimized to fit within model's token limit while getting complete response
+                            val presetMessage = """Medicine scanned: $detectedText
 
-$detectedText
-
-Please provide detailed information about this medicine:
-- What is it used for?
-- What are the main uses and indications?
-- What precautions should be taken?
-- Any important warnings or contraindications?
-- Recommended dosage and usage instructions?
-
-Thank you!"""
+Provide a brief overview covering: 1) What it's used for, 2) Key precautions, 3) Common dosage. Keep response concise."""
                             onNavigateToChat(presetMessage)
                         },
                         onAddToInsights = {
