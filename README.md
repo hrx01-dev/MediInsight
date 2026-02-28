@@ -1,7 +1,64 @@
-# RunAnywhere SDK - Simple Chat App
+🧠 MediInsight – Edge AI Medicine Assistant for Elderly
+MediInsight is an AI-powered Android application designed to help elderly users understand their medicines easily. The app uses OCR and an on-device Large Language Model (LLM) to scan medicine strips and generate contextual explanations without requiring internet access.
+🚀 Key Features
+📷 OCR-Based Medicine Scanning
+Extracts medicine name and details from packaging
+🧠 On-Device LLM Reasoning
+Generates contextual explanations
+Answers natural language questions
+📱 Offline Functionality
+No internet required
+Privacy-preserving architecture
+✍️ Manual Medicine Entry
+Allows user correction in case of OCR errors
+👵 Elder-Friendly Design
+Simple UI
+Large readable fonts
+🏗 System Architecture
+Copy code
 
-A simple Android chat application demonstrating the RunAnywhere SDK for on-device AI inference.
-
+Camera
+   ↓
+OCR Module (Text Extraction)
+   ↓
+On-Device LLM (Reasoning & Explanation)
+   ↓
+User-Friendly Insight Output
+Components:
+Frontend: Android (Kotlin / Jetpack Compose)
+OCR Engine: (e.g., ML Kit / Tesseract)
+LLM Engine: On-device quantized Large Language Model
+Inference: Edge-based local processing
+#🧠 Why LLM Instead of a Relational Database?
+Traditional relational databases:
+Store structured medicine data
+Perform deterministic lookups
+Cannot interpret natural language queries
+MediInsight uses an LLM because:
+It understands flexible user questions
+It generates simplified explanations
+It handles incomplete OCR text
+It performs contextual reasoning
+It adapts language for elderly users
+This enables dynamic interaction rather than static data retrieval.
+🔒 Privacy & Edge AI
+All processing happens locally on the device:
+No prescription data is sent to the cloud
+No external API dependency
+Reduced latency
+Enhanced data privacy
+This makes the system suitable for sensitive healthcare scenarios.
+⚠ Medical Disclaimer
+MediInsight provides informational assistance only.
+It does not replace professional medical advice.
+Users are advised to consult qualified healthcare professionals for medical decisions.
+📊 Future Improvements
+Drug interaction detection
+Structured medical database validation (Hybrid RAG approach)
+Multilingual support
+Voice-based query input
+Medicine reminder system
+Fine-tuned lightweight medical LLM
 ## What This App Does
 
 This is a minimal example showing how to:
