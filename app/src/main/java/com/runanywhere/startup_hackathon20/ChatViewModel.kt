@@ -221,27 +221,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
-            // Save user message to database with current timestamp
-            val userTimestamp = System.currentTimeMillis()
-            val userMessageEntity = ChatMessageEntity(
-                userId = userId,
-                text = text,
-                isUser = true,
-                timestamp = userTimestamp
-            )
-            repository.insertMessage(userMessageEntity, userId)
-
             _isLoading.value = true
 
             try {
-                // Build conversation context with smart limiting
+                // Build conversation context with smart limiting BEFORE saving the new message
+                // This ensures we don't include the current message in the context
                 val currentMessages = _messages.value
                 val isLongMessage = text.length > 500 // Check if current message is very long (like scanned medicine)
                 
                 // For long messages (scanned text), limit context to last 4 messages
                 // For normal messages, use last 10 messages
-                val maxContextMessages = if (isLongMessage) 4 else 10
-                val maxContextChars = if (isLongMessage) 800 else 2000 // Limit total context size
+                val maxContextMessages = if (isLongMessage) 3 else 10
+                val maxContextChars = if (isLongMessage) 500 else 2000 // Limit total context size
                 
                 val contextMessages = currentMessages.takeLast(maxContextMessages)
                 
@@ -278,7 +269,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     append("Assistant:")
                 }
                 
-                Log.d("ChatViewModel", "Sending prompt - Message length: ${text.length}, Context messages: ${contextMessages.size}, Total prompt length: ${contextPrompt.length}")
+                Log.d("ChatViewModel", "Sending prompt - Message length: ${text.length}, IsLongMessage: $isLongMessage, Context messages: ${contextMessages.size}, Total prompt length: ${contextPrompt.length}")
+                Log.d("ChatViewModel", "Prompt preview: ${contextPrompt.take(200)}...")
+                
+                // Save user message to database AFTER building context
+                val userTimestamp = System.currentTimeMillis()
+                val userMessageEntity = ChatMessageEntity(
+                    userId = userId,
+                    text = text,
+                    isUser = true,
+                    timestamp = userTimestamp
+                )
+                repository.insertMessage(userMessageEntity, userId)
                 
                 // Generate response with streaming
                 var assistantResponse = ""
@@ -314,18 +316,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
                 // If response is empty, something went wrong
                 if (assistantResponse.isEmpty()) {
+                    Log.e("ChatViewModel", "Empty response received from model - ModelID: $_currentModelId, Prompt length: ${contextPrompt.length}")
                     val errorEntity = ChatMessageEntity(
                         userId = userId,
-                        text = "Error: Model failed to generate a response. Try reloading the model.",
+                        text = "Error: Model failed to generate a response. The input might be too long. Try clearing the chat or reloading the model.",
                         isUser = false,
                         timestamp = assistantTimestamp
                     )
                     repository.insertMessage(errorEntity, userId)
-                    _statusMessage.value = "Model not responding. Please reload the model."
+                    _statusMessage.value = "Model not responding. Try clearing chat or reloading model."
                     _currentModelId.value = null // Reset model state
                     _isModelVerified.value = false
                 }
             } catch (e: Exception) {
+                Log.e("ChatViewModel", "Exception during message generation: ${e.message}", e)
                 // Save error message to database
                 val errorMessage = if (e.message?.contains("model", ignoreCase = true) == true) {
                     "Model is not properly loaded. Please reload the model and try again."
