@@ -2,6 +2,7 @@ package com.runanywhere.startup_hackathon20.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.startup_hackathon20.database.MedicineDatabase
@@ -126,14 +127,17 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     
     // Public function to send welcome notification (called after permission is granted)
     fun sendWelcomeNotificationNow(userName: String) {
+        Log.d("AuthViewModel", "sendWelcomeNotificationNow called for: $userName")
         sendWelcomeNotification(userName)
     }
     
     private fun sendWelcomeNotification(userName: String) {
+        Log.d("AuthViewModel", "Sending welcome notification for: $userName")
         // Send a welcome notification to the user's device
         NotificationHelper.sendWelcomeNotification(
             context = context,
             userName = userName
         )
+        Log.d("AuthViewModel", "Welcome notification sent (or attempted)")
     }
 }

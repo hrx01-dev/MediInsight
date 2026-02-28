@@ -52,19 +52,31 @@ fun AuthScreen(
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        android.util.Log.d("AuthScreen", "Notification permission granted: $isGranted")
+        android.util.Log.d("AuthScreen", "Notification permission result - Granted: $isGranted, JustSignedUp: $justSignedUp, UserName: $signupUserName")
         if (isGranted && justSignedUp && signupUserName.isNotEmpty()) {
+            android.util.Log.d("AuthScreen", "Attempting to send welcome notification...")
             // Send welcome notification now that permission is granted
             viewModel?.sendWelcomeNotificationNow(signupUserName)
+        } else {
+            android.util.Log.w("AuthScreen", "Not sending notification - Permission: $isGranted, JustSignedUp: $justSignedUp, HasName: ${signupUserName.isNotEmpty()}")
         }
     }
 
     // Navigate when auth is successful
     LaunchedEffect(authSuccess) {
         if (authSuccess) {
+            android.util.Log.d("AuthScreen", "Auth success - JustSignedUp: $justSignedUp")
             // Request notification permission on Android 13+ after signup
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && justSignedUp) {
+                android.util.Log.d("AuthScreen", "Requesting notification permission for user: $signupUserName")
+                kotlinx.coroutines.delay(500) // Small delay before showing permission dialog
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                kotlinx.coroutines.delay(1000) // Wait for permission result and notification to be sent
+            } else if (justSignedUp) {
+                // For Android 12 and below, send notification directly
+                android.util.Log.d("AuthScreen", "Android < 13, sending notification directly")
+                viewModel?.sendWelcomeNotificationNow(signupUserName)
+                kotlinx.coroutines.delay(500) // Wait for notification to be sent
             }
             onComplete()
         }
