@@ -234,13 +234,36 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             _isLoading.value = true
 
             try {
+                // Build conversation context from last 10-15 messages
+                val currentMessages = _messages.value
+                val contextMessages = currentMessages.takeLast(15) // Get last 15 messages (excluding the one we just added)
+                
+                // Build prompt with conversation history
+                val contextPrompt = buildString {
+                    if (contextMessages.isNotEmpty()) {
+                        append("Previous conversation:\n")
+                        contextMessages.forEach { msg ->
+                            if (msg.isUser) {
+                                append("User: ${msg.text}\n")
+                            } else {
+                                append("Assistant: ${msg.text}\n")
+                            }
+                        }
+                        append("\n")
+                    }
+                    append("User: $text\n")
+                    append("Assistant:")
+                }
+                
+                Log.d("ChatViewModel", "Sending prompt with context: ${contextMessages.size} previous messages")
+                
                 // Generate response with streaming
                 var assistantResponse = ""
                 var assistantMessageId: Long? = null
                 // Ensure assistant message has a later timestamp
                 val assistantTimestamp = userTimestamp + 1
 
-                RunAnywhere.generateStream(text).collect { token ->
+                RunAnywhere.generateStream(contextPrompt).collect { token ->
                     assistantResponse += token
 
                     // Save or update assistant message in database
