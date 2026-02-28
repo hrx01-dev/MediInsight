@@ -70,7 +70,7 @@ fun NotificationsScreen(
                 )
             }
             Spacer(Modifier.width(12.dp))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "Notifications",
                     color = Color.White,
@@ -82,6 +82,23 @@ fun NotificationsScreen(
                     color = Color.White.copy(alpha = 0.9f),
                     style = MaterialTheme.typography.bodySmall
                 )
+            }
+            
+            // Button to send notifications to device
+            if (notifications.isNotEmpty()) {
+                IconButton(
+                    onClick = { viewModel?.sendAllNotificationsNow() },
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f))
+                ) {
+                    Icon(
+                        Icons.Default.NotificationsActive,
+                        contentDescription = "Send to Device",
+                        tint = Color.White
+                    )
+                }
             }
         }
 

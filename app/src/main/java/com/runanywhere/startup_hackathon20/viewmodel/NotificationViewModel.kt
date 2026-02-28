@@ -1,12 +1,14 @@
 package com.runanywhere.startup_hackathon20.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.startup_hackathon20.database.MedicineDatabase
 import com.runanywhere.startup_hackathon20.database.MedicineEntity
 import com.runanywhere.startup_hackathon20.database.MedicineRepository
 import com.runanywhere.startup_hackathon20.database.UserRepository
+import com.runanywhere.startup_hackathon20.notification.NotificationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -38,6 +40,7 @@ sealed class NotificationItem {
 
 class NotificationViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val context: Context = application.applicationContext
     private val medicineRepository: MedicineRepository
     private val userRepository: UserRepository
 
@@ -53,6 +56,9 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
         medicineRepository = MedicineRepository(medicineDao)
         userRepository = UserRepository(userDao)
 
+        // Create notification channel on initialization
+        NotificationHelper.createNotificationChannel(context)
+        
         loadCurrentUser()
     }
 
@@ -343,5 +349,26 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
 
     fun refreshNotifications() {
         _currentUserId.value?.let { loadNotifications(it) }
+    }
+    
+    // Send system notifications for all current medication reminders
+    fun sendAllNotificationsNow() {
+        viewModelScope.launch {
+            _notifications.value.forEach { notification ->
+                if (notification is NotificationItem.Reminder) {
+                    val reminder = notification.reminder
+                    // Generate unique notification ID
+                    val notificationId = (reminder.id.toString() + reminder.time.hashCode()).hashCode()
+                    
+                    NotificationHelper.sendMedicineReminder(
+                        context = context,
+                        medicineName = reminder.medicineName,
+                        dosage = reminder.dosage,
+                        instructions = reminder.instructions,
+                        notificationId = notificationId
+                    )
+                }
+            }
+        }
     }
 }
