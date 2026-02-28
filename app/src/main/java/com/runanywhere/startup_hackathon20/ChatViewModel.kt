@@ -230,60 +230,74 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 // Build conversation context with smart limiting BEFORE saving the new message
                 // This ensures we don't include the current message in the context
                 val currentMessages = _messages.value
+                val hasNoContext = currentMessages.isEmpty()
                 val isLongMessage = text.length > 500 // Check if current message is very long (like scanned medicine)
                 
-                // Smart context limits based on current message length
-                val maxContextMessages = if (isLongMessage) 2 else 8
-                val maxTotalContextChars = 1500 // Maximum total characters for all context
-                val maxSingleMessageChars = 300 // Maximum characters per individual context message
-                
-                val contextMessages = currentMessages.takeLast(maxContextMessages)
-                
-                // Build prompt with conversation history, truncating long messages
-                val contextPrompt = buildString {
-                    if (contextMessages.isNotEmpty()) {
-                        var contextCharsUsed = 0
-                        val relevantMessages = mutableListOf<Pair<ChatMessage, String>>()
-                        
-                        // Process messages from newest to oldest
-                        for (msg in contextMessages.reversed()) {
-                            // Truncate very long messages but keep recent context
-                            val truncatedText = if (msg.text.length > maxSingleMessageChars) {
-                                // For long messages, take beginning and add ellipsis
-                                msg.text.take(maxSingleMessageChars) + "... [truncated]"
-                            } else {
-                                msg.text
-                            }
+                // If this is the first message (no context), send it directly without truncation
+                val contextPrompt = if (hasNoContext) {
+                    // First message - send as-is for complete information
+                    buildString {
+                        append("$text\n")
+                        append("Assistant:")
+                    }
+                } else {
+                    // Has context - apply smart truncation
+                    // Smart context limits based on current message length
+                    val maxContextMessages = if (isLongMessage) 2 else 6
+                    val maxTotalContextChars = 2000 // Maximum total characters for all context
+                    val maxSingleMessageChars = 400 // Maximum characters per individual context message
+                    
+                    val contextMessages = currentMessages.takeLast(maxContextMessages)
+                    
+                    // Build prompt with conversation history, truncating long messages
+                    buildString {
+                        if (contextMessages.isNotEmpty()) {
+                            var contextCharsUsed = 0
+                            val relevantMessages = mutableListOf<Pair<ChatMessage, String>>()
                             
-                            val msgLength = truncatedText.length + 20 // +20 for "User: " or "Assistant: " prefix
-                            
-                            // Only add if we haven't exceeded total context limit
-                            if (contextCharsUsed + msgLength <= maxTotalContextChars) {
-                                relevantMessages.add(0, Pair(msg, truncatedText)) // Add to front to maintain order
-                                contextCharsUsed += msgLength
-                            } else {
-                                // Stop adding more context if we're at limit
-                                break
-                            }
-                        }
-                        
-                        if (relevantMessages.isNotEmpty()) {
-                            append("Previous conversation:\n")
-                            relevantMessages.forEach { (msg, truncatedText) ->
-                                if (msg.isUser) {
-                                    append("User: $truncatedText\n")
+                            // Process messages from newest to oldest
+                            for ((index, msg) in contextMessages.reversed().withIndex()) {
+                                // For the most recent pair (user + assistant), keep more text
+                                val charLimitForThisMsg = if (index < 2) maxSingleMessageChars else 200
+                                
+                                // Truncate very long messages but keep recent context
+                                val truncatedText = if (msg.text.length > charLimitForThisMsg) {
+                                    // For long messages, take beginning and add ellipsis
+                                    msg.text.take(charLimitForThisMsg) + "... [truncated]"
                                 } else {
-                                    append("Assistant: $truncatedText\n")
+                                    msg.text
+                                }
+                                
+                                val msgLength = truncatedText.length + 20 // +20 for "User: " or "Assistant: " prefix
+                                
+                                // Only add if we haven't exceeded total context limit
+                                if (contextCharsUsed + msgLength <= maxTotalContextChars) {
+                                    relevantMessages.add(0, Pair(msg, truncatedText)) // Add to front to maintain order
+                                    contextCharsUsed += msgLength
+                                } else {
+                                    // Stop adding more context if we're at limit
+                                    break
                                 }
                             }
-                            append("\n")
+                            
+                            if (relevantMessages.isNotEmpty()) {
+                                append("Previous conversation:\n")
+                                relevantMessages.forEach { (msg, truncatedText) ->
+                                    if (msg.isUser) {
+                                        append("User: $truncatedText\n")
+                                    } else {
+                                        append("Assistant: $truncatedText\n")
+                                    }
+                                }
+                                append("\n")
+                            }
                         }
+                        append("User: $text\n")
+                        append("Assistant:")
                     }
-                    append("User: $text\n")
-                    append("Assistant:")
                 }
                 
-                Log.d("ChatViewModel", "Sending prompt - Message length: ${text.length}, IsLongMessage: $isLongMessage, Context messages: ${contextMessages.size}, Total prompt length: ${contextPrompt.length}")
+                Log.d("ChatViewModel", "Sending prompt - Message length: ${text.length}, HasContext: ${!hasNoContext}, IsLongMessage: $isLongMessage, Total prompt length: ${contextPrompt.length}")
                 Log.d("ChatViewModel", "Prompt preview: ${contextPrompt.take(200)}...")
                 
                 // Save user message to database AFTER building context
