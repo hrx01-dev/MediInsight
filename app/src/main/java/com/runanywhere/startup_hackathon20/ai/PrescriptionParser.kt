@@ -6,7 +6,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Structures OCR text into medicine entries using MediInsight's configured on-device model. */
+/** Structures OCR text into medicine entries using MediInsight's configured AI model. */
 object PrescriptionParser {
     data class Medicine(
         val name: String = "",
@@ -30,14 +30,19 @@ object PrescriptionParser {
             val tableMedicines = parseTabularFallback(ocrText)
             if (tableMedicines.isNotEmpty()) return@withContext tableMedicines
         }
-        val prompt = """You extract medication orders from OCR of a prescription. The OCR may be laid out as a table where each medicine row contains separate cells for name, purpose, dose, route, and frequency. Reconstruct row relationships by reading order and nearby lines. Return ONLY valid JSON in this schema:
+        val prompt = """You are converting OCR text from a medicine prescription into structured medicine insights for the user to review. OCR may have merged table columns, split a row across lines, or introduced spelling/spacing noise. Carefully reconstruct the table row relationships from headers, reading order, and nearby values. Correct obvious OCR spacing/character errors in medicine names and field values only when the intended value is clear from the text. Never guess a missing value.
+
+Return ONLY valid JSON in exactly this schema, with one object for every prescribed medicine:
 {"medicines":[{"name":"","dosage":"","frequency":"","time":"","duration":"","quantity":"","instructions":""}]}
 
 Rules:
-- Include each medicine name from the prescribed medications table, even when its name has no numeric strength or dosage form. Include only rows from that table; never use patient/doctor/hospital details, headings, purpose, or route as medicine names.
-- Keep every medicine as its own object. Copy only supported details from the text; use empty strings for missing fields.
-- dosage is strength/dose (example: 500 mg or 1 tablet); frequency is how often (example: twice daily); time is time of day or relation to meals; duration is course length; quantity is total units only when explicitly stated; instructions are other explicit medicine-specific directions.
-- Do not put the same value in multiple fields. Do not treat OCR headings, names, addresses, dates, diagnoses, or signatures as medicines.
+- Include every distinct medicine listed in the prescribed medication rows, including a medicine name with no printed strength. Do not omit later rows.
+- Create exactly one object per medicine. Keep each medicine's dosage, frequency, timing, duration, quantity, and directions attached only to its own row.
+- name is the medicine name; dosage is strength or per-dose amount (for example, 500 mg or 1 tablet); frequency is how often (for example, every 8 hours); time is time of day or relation to meals; duration is course length; quantity is total units only when explicitly printed; instructions are other explicit medicine-specific directions.
+- Keep purpose/indication separate from medicine name. Do not put route (oral, IV, topical) into dosage, frequency, or instructions unless the text explicitly gives it as an instruction.
+- Use an empty string for every field that is not explicitly present. Never infer medicine, strength, schedule, quantity, or duration from purpose or general knowledge. Do not duplicate one value across multiple fields.
+- Never return patient, doctor, clinic, pharmacy, diagnosis, allergy, date, heading, or signature information as a medicine.
+- Use only the keys in the schema. Do not include markdown, explanations, or text outside the JSON object.
 
 OCR text:
 ${ocrText.take(6000)}""".trimIndent()
@@ -49,7 +54,8 @@ ${ocrText.take(6000)}""".trimIndent()
             val modelMedicines = result?.medicines.orEmpty().filter { medicine ->
                 val name = medicine.name.trim()
                 name.length >= 2 && !nonMedicineHeadings.containsMatchIn(name) &&
-                    (medicineEvidence.containsMatchIn(name + " " + medicine.dosage) || medicine.frequency.isNotBlank())
+                    (ocrText.contains(name, ignoreCase = true) ||
+                        medicineEvidence.containsMatchIn(name + " " + medicine.dosage) || medicine.frequency.isNotBlank())
             }
             (modelMedicines.ifEmpty { parseTabularFallback(ocrText) }).distinctBy { it.name.lowercase() }
         } catch (e: Exception) {
