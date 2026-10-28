@@ -53,6 +53,13 @@ fun ChatScreen(
     viewModel: ChatViewModel = viewModel(),
     androidSpeechViewModel: AndroidSpeechViewModel = viewModel()
 ) {
+    val prescriptionPrefix = "Structure all medicines from this prescription OCR:\n"
+    val prescriptionText = presetMessage?.takeIf { it.startsWith(prescriptionPrefix) }?.removePrefix(prescriptionPrefix)
+    val medicineViewModel: com.runanywhere.startup_hackathon20.viewmodel.MedicineViewModel = viewModel()
+    var structuredMedicines by remember(presetMessage) { mutableStateOf<List<com.runanywhere.startup_hackathon20.ai.PrescriptionParser.Medicine>>(emptyList()) }
+    var prescriptionBusy by remember(presetMessage) { mutableStateOf(false) }
+    var prescriptionStatus by remember(presetMessage) { mutableStateOf("") }
+    var prescriptionSaved by remember(presetMessage) { mutableStateOf(false) }
     var inputText by remember { mutableStateOf(TextFieldValue("")) }
     var showModelDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -105,7 +112,17 @@ fun ChatScreen(
             android.util.Log.d("ChatScreen", "Model verified, waiting 2 seconds before sending preset...")
             kotlinx.coroutines.delay(2000)
             android.util.Log.d("ChatScreen", "Sending preset message: ${presetMessage.take(50)}...")
-            viewModel.sendMessage(presetMessage)
+            if (prescriptionText != null) {
+                prescriptionBusy = true
+                try {
+                    structuredMedicines = com.runanywhere.startup_hackathon20.ai.PrescriptionParser.parse(prescriptionText, forceAi = true)
+                    prescriptionStatus = if (structuredMedicines.isEmpty()) "No medicines identified. Check the OCR text and try again." else "Review these fields before saving."
+                } catch (e: Exception) {
+                    prescriptionStatus = "Could not structure prescription: ${e.message}"
+                } finally {
+                    prescriptionBusy = false
+                }
+            } else viewModel.sendMessage(presetMessage)
             presetMessageSent = true
         } else if (!presetMessage.isNullOrBlank() && !presetMessageSent) {
             android.util.Log.d("ChatScreen", "Waiting for model - Verified: $isModelVerified, ModelID: $currentModelId, Status: $statusMessage")
@@ -639,6 +656,44 @@ fun ChatScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            if (prescriptionText != null) {
+                item {
+                    Text(presetMessage.orEmpty(), style = MaterialTheme.typography.bodyMedium)
+                    if (prescriptionBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Text(prescriptionStatus)
+                }
+                items(structuredMedicines) { medicine ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(medicine.name, fontWeight = FontWeight.Bold)
+                            listOf("Dosage" to medicine.dosage, "Frequency" to medicine.frequency,
+                                "Time" to medicine.time, "Duration" to medicine.duration,
+                                "Quantity" to medicine.quantity, "Instructions" to medicine.instructions
+                            ).forEach { (label, value) -> Text("$label: ${value.ifBlank { "Not specified" }}") }
+                        }
+                    }
+                }
+                if (structuredMedicines.isNotEmpty()) {
+                    item {
+                        Button(enabled = !prescriptionBusy && !prescriptionSaved, onClick = {
+                            prescriptionBusy = true
+                            coroutineScope.launch {
+                                try {
+                                    medicineViewModel.insertMedicinesAndAwait(structuredMedicines).getOrThrow()
+                                    prescriptionSaved = true
+                                    prescriptionStatus = "Saved all medicines to Insights."
+                                } catch (e: Exception) {
+                                    prescriptionStatus = "Save failed: ${e.message}"
+                                } finally {
+                                    prescriptionBusy = false
+                                }
+                            }
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text(if (prescriptionSaved) "Saved to Insights" else "Save all to Insights")
+                        }
+                    }
+                }
+            }
             // Show welcome message if no messages
             if (messages.isEmpty()) {
                 item {
