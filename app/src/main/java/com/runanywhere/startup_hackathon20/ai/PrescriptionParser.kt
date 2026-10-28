@@ -24,10 +24,12 @@ object PrescriptionParser {
     private val nonMedicineHeadings = Regex("(?i)\\b(?:prescription|template|prescription no|prescription date|patient information|patient|name|age|phone|email|address|date of birth|gender|allergies|health condition|list of prescribed medications|medication name|purpose|dosage|dose|route|frequency|physician|signature|registration|diagnosis)\\b")
     private val ignoredTerms = Regex("(?i)\\b(?:oral|intravenous|topical|purpose|infection|immune system|fever|phlegm)\\b")
 
-    suspend fun parse(ocrText: String): List<Medicine> = withContext(Dispatchers.IO) {
+    suspend fun parse(ocrText: String, forceAi: Boolean = false): List<Medicine> = withContext(Dispatchers.IO) {
         if (ocrText.isBlank()) return@withContext emptyList()
-        val tableMedicines = parseTabularFallback(ocrText)
-        if (tableMedicines.isNotEmpty()) return@withContext tableMedicines
+        if (!forceAi) {
+            val tableMedicines = parseTabularFallback(ocrText)
+            if (tableMedicines.isNotEmpty()) return@withContext tableMedicines
+        }
         val prompt = """You extract medication orders from OCR of a prescription. The OCR may be laid out as a table where each medicine row contains separate cells for name, purpose, dose, route, and frequency. Reconstruct row relationships by reading order and nearby lines. Return ONLY valid JSON in this schema:
 {"medicines":[{"name":"","dosage":"","frequency":"","time":"","duration":"","quantity":"","instructions":""}]}
 
