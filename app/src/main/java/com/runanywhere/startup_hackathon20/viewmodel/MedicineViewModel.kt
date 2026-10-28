@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import com.runanywhere.startup_hackathon20.database.MedicineDatabase
 import com.runanywhere.startup_hackathon20.database.MedicineEntity
 import com.runanywhere.startup_hackathon20.database.MedicineRepository
@@ -63,6 +64,34 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             Result.success(medicineId)
         } catch (e: Exception) {
             Log.e("MedicineViewModel", "Error inserting medicine: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun insertMedicinesAndAwait(medicines: List<com.runanywhere.startup_hackathon20.ai.PrescriptionParser.Medicine>): Result<Int> {
+        val userId = _currentUserId.value ?: return Result.failure(IllegalStateException("No user logged in"))
+        if (medicines.isEmpty()) return Result.failure(IllegalArgumentException("No medicines to save"))
+        return try {
+            val database = MedicineDatabase.getDatabase(getApplication())
+            database.withTransaction {
+                medicines.forEach { medicine ->
+                    repository.insertMedicine(
+                        MedicineEntity(
+                            userId = userId,
+                            name = medicine.name,
+                            dosage = medicine.dosage,
+                            frequency = medicine.frequency,
+                            time = medicine.time,
+                            duration = medicine.duration,
+                            quantity = medicine.quantity,
+                            instructions = medicine.instructions
+                        )
+                    )
+                }
+            }
+            Result.success(medicines.size)
+        } catch (e: Exception) {
+            Log.e("MedicineViewModel", "Atomic prescription save failed: ${e.message}", e)
             Result.failure(e)
         }
     }
