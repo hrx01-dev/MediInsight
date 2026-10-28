@@ -92,11 +92,39 @@ fun MedicineScannerScreen(
                     val image = InputImage.fromFilePath(context, uri)
                     val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
                     val result = recognizer.process(image).await()
-                    scannerViewModel.updateDetectedText(result.text)
                     recognizer.close()
-                    if (result.text.isBlank()) prescriptionError = "No readable text found in that image. Try a clear, well-lit image."
+                    if (result.text.isBlank()) {
+                        prescriptionError = "No readable text found in that image. Try a clear, well-lit image."
+                        return@launch
+                    }
+                    scannerViewModel.updateDetectedText(result.text)
+                    isParsingPrescription = true
+                    prescriptionError = null
+                    val parsed = PrescriptionParser.parse(result.text)
+                    if (parsed.isEmpty()) {
+                        prescriptionError = "OCR read the image, but no medicines could be identified. Check the recognized text and try a clearer image."
+                        return@launch
+                    }
+                    prescriptionMedicines = parsed
+                    var savedCount = 0
+                    for (medicine in parsed) {
+                        val saved = medicineViewModel.insertMedicineAndAwait(
+                            name = medicine.name,
+                            dosage = medicine.dosage,
+                            frequency = medicine.frequency,
+                            time = medicine.time,
+                            duration = medicine.duration,
+                            quantity = medicine.quantity,
+                            instructions = medicine.instructions
+                        )
+                        if (saved.isSuccess) savedCount++ else throw saved.exceptionOrNull() ?: IllegalStateException("Could not save ${medicine.name}")
+                    }
+                    prescriptionSaved = savedCount == parsed.size
+                    if (prescriptionSaved) prescriptionError = "Added $savedCount medicine${if (savedCount == 1) "" else "s"} to Insights."
                 } catch (e: Exception) {
-                    prescriptionError = "Could not read that image: ${e.message ?: "unknown error"}"
+                    prescriptionError = "Could not process the prescription: ${e.message ?: "unknown error"}"
+                } finally {
+                    isParsingPrescription = false
                 }
             }
         }
