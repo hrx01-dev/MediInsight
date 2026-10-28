@@ -128,7 +128,7 @@ fun MedicineScannerScreen(
                 FilterChip(selected = !prescriptionMode, onClick = { prescriptionMode = false; prescriptionSaved = false }, label = { Text("Medicine") }, leadingIcon = { Icon(Icons.Default.Medication, null) })
                 FilterChip(selected = prescriptionMode, onClick = {
                     prescriptionMode = true
-                    if (isScanning) scannerViewModel.pauseScanning()
+                    scannerViewModel.resumeScanning()
                     prescriptionCapture = false
                     prescriptionSaved = false
                     prescriptionMedicines = emptyList()
@@ -147,9 +147,9 @@ fun MedicineScannerScreen(
                             context = context,
                             lifecycleOwner = lifecycleOwner,
                             cameraProvider = cameraProvider,
-                            isScanning = isScanning && (!prescriptionMode || !prescriptionCapture),
+                            isScanning = isScanning,
                             onTextDetected = { text ->
-                                if (!prescriptionMode || prescriptionCapture) scannerViewModel.updateDetectedText(text)
+                                if (!prescriptionMode || !prescriptionCapture) scannerViewModel.updateDetectedText(text)
                             },
                             onError = { exception ->
                                 scannerViewModel.setError(exception.message ?: "Unknown error")
@@ -178,7 +178,7 @@ fun MedicineScannerScreen(
                             saved = prescriptionSaved,
                             onToggleScanning = { scannerViewModel.toggleScanning() },
                             onCapturePrescription = {
-                                if (isScanning) scannerViewModel.pauseScanning()
+                                scannerViewModel.pauseScanning()
                                 prescriptionCapture = true
                                 prescriptionSaved = false
                             },
@@ -717,3 +717,6 @@ fun PermissionRationale(
         }
     }
 }
+
+
+
