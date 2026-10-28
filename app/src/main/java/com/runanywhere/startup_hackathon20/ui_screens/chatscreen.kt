@@ -125,7 +125,7 @@ fun ChatScreen(
             if (prescriptionText != null) {
                 prescriptionBusy = true
                 try {
-                    structuredMedicines = com.runanywhere.startup_hackathon20.ai.PrescriptionParser.parse(prescriptionText, forceAi = true)
+                    structuredMedicines = viewModel.sendPrescriptionMessage(prescriptionText)
                     prescriptionStatus = if (structuredMedicines.isEmpty()) "No medicines identified. Check the OCR text and try again." else "Review these fields before saving."
                 } catch (e: Exception) {
                     prescriptionStatus = "Could not structure prescription: ${e.message}"
@@ -671,44 +671,6 @@ fun ChatScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (prescriptionText != null) {
-                item {
-                    Text(presetMessage.orEmpty(), style = MaterialTheme.typography.bodyMedium)
-                    if (prescriptionBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Text(prescriptionStatus)
-                }
-                items(structuredMedicines) { medicine ->
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text(medicine.name, fontWeight = FontWeight.Bold)
-                            listOf("Dosage" to medicine.dosage, "Frequency" to medicine.frequency,
-                                "Time" to medicine.time, "Duration" to medicine.duration,
-                                "Quantity" to medicine.quantity, "Instructions" to medicine.instructions
-                            ).forEach { (label, value) -> Text("$label: ${value.ifBlank { "Not specified" }}") }
-                        }
-                    }
-                }
-                if (structuredMedicines.isNotEmpty()) {
-                    item {
-                        Button(enabled = !prescriptionBusy && !prescriptionSaved, onClick = {
-                            prescriptionBusy = true
-                            coroutineScope.launch {
-                                try {
-                                    medicineViewModel.insertMedicinesAndAwait(structuredMedicines).getOrThrow()
-                                    prescriptionSaved = true
-                                    prescriptionStatus = "Saved all medicines to Insights."
-                                } catch (e: Exception) {
-                                    prescriptionStatus = "Save failed: ${e.message}"
-                                } finally {
-                                    prescriptionBusy = false
-                                }
-                            }
-                        }, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (prescriptionSaved) "Saved to Insights" else "Save all to Insights")
-                        }
-                    }
-                }
-            }
             // Show welcome message if no messages
             if (messages.isEmpty()) {
                 item {
@@ -772,6 +734,44 @@ fun ChatScreen(
                 }
             }
 
+            if (prescriptionText != null) {
+                item {
+                    Text("Prescription analysis", style = MaterialTheme.typography.titleMedium)
+                    if (prescriptionBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Text(prescriptionStatus)
+                }
+                items(structuredMedicines) { medicine ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(medicine.name, fontWeight = FontWeight.Bold)
+                            listOf("Dosage" to medicine.dosage, "Frequency" to medicine.frequency,
+                                "Time" to medicine.time, "Duration" to medicine.duration,
+                                "Quantity" to medicine.quantity, "Instructions" to medicine.instructions
+                            ).forEach { (label, value) -> Text("$label: ${value.ifBlank { "Not specified" }}") }
+                        }
+                    }
+                }
+                if (structuredMedicines.isNotEmpty()) {
+                    item {
+                        Button(enabled = !prescriptionBusy && !prescriptionSaved, onClick = {
+                            prescriptionBusy = true
+                            coroutineScope.launch {
+                                try {
+                                    medicineViewModel.insertMedicinesAndAwait(structuredMedicines).getOrThrow()
+                                    prescriptionSaved = true
+                                    prescriptionStatus = "Saved all medicines to Insights."
+                                } catch (e: Exception) {
+                                    prescriptionStatus = "Save failed: ${e.message}"
+                                } finally {
+                                    prescriptionBusy = false
+                                }
+                            }
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text(if (prescriptionSaved) "Saved to Insights" else "Save all to Insights")
+                        }
+                    }
+                }
+            }
             // 🔥 SUGGESTIONS when no messages
             if (messages.isEmpty()) {
                 item {
