@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -69,7 +71,11 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     }
 
     suspend fun insertMedicinesAndAwait(medicines: List<com.runanywhere.startup_hackathon20.ai.PrescriptionParser.Medicine>): Result<Int> {
-        val userId = _currentUserId.value ?: return Result.failure(IllegalStateException("No user logged in"))
+        val userId = try {
+            _currentUserId.filterNotNull().first()
+        } catch (e: Exception) {
+            return Result.failure(IllegalStateException("No user logged in", e))
+        }
         if (medicines.isEmpty()) return Result.failure(IllegalArgumentException("No medicines to save"))
         return try {
             val database = MedicineDatabase.getDatabase(getApplication())
