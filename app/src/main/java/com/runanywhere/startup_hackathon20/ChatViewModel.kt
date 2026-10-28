@@ -14,6 +14,7 @@ import com.runanywhere.startup_hackathon20.database.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ensureActive
 
 // Simple Message Data Class
 data class ChatMessage(
@@ -149,13 +150,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         // Await the download result; collecting the progress stream alone
                         // can finish even when the underlying download task failed.
-                        val path = com.runanywhere.sdk.foundation.ServiceContainer.shared
-                            .downloadService.downloadModel(model) { progress ->
-                                val fraction = if (progress.totalBytes > 0)
-                                    progress.bytesDownloaded.toFloat() / progress.totalBytes else 0f
-                                _downloadProgress.value = fraction.coerceIn(0f, 1f)
-                                _statusMessage.value = "Downloading: ${progress.bytesDownloaded / 1048576} MB"
-                            }
+                        val path = try {
+                            com.runanywhere.sdk.foundation.ServiceContainer.shared
+                                .downloadService.downloadModel(model) { progress ->
+                                    val fraction = if (progress.totalBytes > 0)
+                                        progress.bytesDownloaded.toFloat() / progress.totalBytes else 0f
+                                    _downloadProgress.value = fraction.coerceIn(0f, 1f)
+                                    _statusMessage.value = "Downloading: ${progress.bytesDownloaded / 1048576} MB"
+                                }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.w("ChatViewModel", "SDK download failed; trying HTTPS directly", e)
+                            downloadModelDirectly(model)
+                        }
                         val file = java.io.File(path)
                         check(file.isFile && file.length() > 4) {
                             "Download returned without a model file"
@@ -184,6 +192,56 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 downloadingModel = false
             }
+        }
+    }
+
+    /** Fallback for SDK downloads that discard the underlying network error. */
+    private suspend fun downloadModelDirectly(model: ModelInfo): String {
+        val url = model.downloadURL ?: error("No download URL registered for this model")
+        check(url.startsWith("https://")) { "Model URL must use HTTPS" }
+        val directory = java.io.File(context.filesDir, "downloaded-models").apply { mkdirs() }
+        val target = java.io.File(directory, model.id.replace(Regex("[^a-zA-Z0-9._-]"), "_") + ".gguf")
+        val partial = java.io.File(target.absolutePath + ".part")
+        val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+        connection.connectTimeout = 30000
+        connection.readTimeout = 60000
+        connection.instanceFollowRedirects = true
+        connection.setRequestProperty("Accept-Encoding", "identity")
+        try {
+            _statusMessage.value = "Connecting to model server..."
+            val status = connection.responseCode
+            check(status == 200) { "Model server returned HTTP $status (${connection.responseMessage})" }
+            val expected = connection.contentLengthLong
+            if (expected > 0) check(directory.usableSpace > expected) { "Not enough storage for the model" }
+            var received = 0L
+            connection.inputStream.use { input ->
+                partial.outputStream().use { output ->
+                    val buffer = ByteArray(65536)
+                    while (true) {
+                        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                        received += count
+                        _downloadProgress.value = if (expected > 0) (received.toFloat() / expected).coerceIn(0f, 1f) else 0f
+                        _statusMessage.value = "Downloading: ${received / 1048576} MB"
+                    }
+                }
+            }
+            check(received > 4 && (expected <= 0 || received == expected)) { "Incomplete model download: $received of $expected bytes" }
+            val magic = ByteArray(4)
+            partial.inputStream().use {
+                check(it.read(magic) == 4 && magic.contentEquals(byteArrayOf(71, 71, 85, 70))) { "Server returned an invalid model file" }
+            }
+            check(partial.renameTo(target)) { "Could not finalize downloaded model" }
+            val updated = model.copy(localPath = target.absolutePath)
+            val services = com.runanywhere.sdk.foundation.ServiceContainer.shared
+            services.modelInfoService.saveModel(updated)
+            services.modelRegistry.updateModel(updated)
+            return target.absolutePath
+        } finally {
+            connection.disconnect()
+            partial.delete()
         }
     }
 
