@@ -100,6 +100,16 @@ fun ChatScreen(
          ).collectAsState()
     val isModelVerified by (viewModel.isModelVerified ).collectAsState()
     
+    // Keep the preset intact while the model downloads and initializes.
+    var automaticSetupStarted by remember(presetMessage) { mutableStateOf(false) }
+    LaunchedEffect(presetMessage, availableModels, isModelVerified) {
+        if (!presetMessage.isNullOrBlank() && !isModelVerified &&
+            availableModels.isNotEmpty() && !automaticSetupStarted) {
+            automaticSetupStarted = true
+            viewModel.prepareModelForPreset()
+        }
+    }
+
     // Track if we already sent the preset message
     var presetMessageSent by remember { mutableStateOf(false) }
     
