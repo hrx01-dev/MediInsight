@@ -54,6 +54,7 @@ import java.util.concurrent.Executors
 @Composable
 fun MedicineScannerScreen(
     onBack: () -> Unit,
+    initialPrescriptionMode: Boolean = false,
     onNavigateToChat: (String) -> Unit = {},
     onNavigateToInsights: (String) -> Unit = {},
     scannerViewModel: ScannerViewModel = viewModel(),
@@ -70,7 +71,7 @@ fun MedicineScannerScreen(
 
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var analyzer by remember { mutableStateOf<TextRecognitionAnalyzer?>(null) }
-    var prescriptionMode by remember { mutableStateOf(false) }
+    var prescriptionMode by remember { mutableStateOf(initialPrescriptionMode) }
     var prescriptionCapture by remember { mutableStateOf(false) }
     var prescriptionSaved by remember { mutableStateOf(false) }
     var prescriptionMedicines by remember { mutableStateOf<List<PrescriptionParser.Medicine>>(emptyList()) }
