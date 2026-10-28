@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.CancellationException
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -77,11 +78,26 @@ fun MedicineScannerScreen(
     var prescriptionError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(detectedText, prescriptionMode, prescriptionCapture) {
         if (!prescriptionMode || !prescriptionCapture || detectedText.isBlank()) return@LaunchedEffect
+        val capturedText = detectedText
         isParsingPrescription = true
         prescriptionError = null
-        prescriptionMedicines = PrescriptionParser.parse(detectedText)
-        if (prescriptionMedicines.isEmpty()) prescriptionError = "No medicines could be confidently extracted. Keep the medicine rows clear and try again."
-        isParsingPrescription = false
+        try {
+            val parsed = PrescriptionParser.parse(capturedText)
+            if (detectedText == capturedText && prescriptionMode && prescriptionCapture) {
+                prescriptionMedicines = parsed
+                if (parsed.isEmpty()) {
+                prescriptionError = "No medicines found in the captured text. Make sure the OCR text includes medicine names and doses, then try again."
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (detectedText == capturedText && prescriptionMode && prescriptionCapture) {
+                prescriptionError = "Could not organize the prescription. Make sure an AI model is downloaded and loaded, then try again."
+            }
+        } finally {
+            isParsingPrescription = false
+        }
     }
 
     // Initialize camera provider
@@ -248,8 +264,18 @@ private fun PrescriptionResultsSection(
 ) {
     Column(modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text("Prescription medicines", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text("Keep the full prescription in view. Review the recognized entries before saving.", style = MaterialTheme.typography.bodySmall)
+        Text("Keep the full prescription in view. Text appears below as it is recognized. Pause the camera, then organize the captured text.", style = MaterialTheme.typography.bodySmall)
         if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+        if (detectedText.isBlank()) {
+            Text(
+                if (isScanning) "Camera is on. Hold the prescription steady and make sure the text is clear." else "Camera is paused. Resume scanning to read the prescription.",
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
+        } else {
+            Text("OCR text detected · ${detectedText.length} characters", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+        }
         if (parsing) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Organizing prescription details…", style = MaterialTheme.typography.bodySmall) }
         parseError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         if (medicines.isEmpty() && !parsing) {
@@ -276,7 +302,7 @@ private fun PrescriptionResultsSection(
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = onCapturePrescription, enabled = detectedText.isNotBlank() && !parsing, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.Description, null)
-            Spacer(Modifier.width(8.dp)); Text("Use detected prescription text")
+            Spacer(Modifier.width(8.dp)); Text(if (parsing) "Organizing…" else "Pause & organize detected text")
         }
         Spacer(Modifier.height(8.dp))
         Button(onClick = onSave, enabled = medicines.isNotEmpty() && !saved && !parsing, modifier = Modifier.fillMaxWidth()) {
