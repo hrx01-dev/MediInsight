@@ -51,8 +51,6 @@ import kotlinx.coroutines.tasks.await
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import java.util.concurrent.Executors
@@ -86,6 +84,9 @@ fun MedicineScannerScreen(
             scannerViewModel.pauseScanning()
             prescriptionCapture = true
             prescriptionSaved = false
+            prescriptionMedicines = emptyList()
+            prescriptionError = null
+            scannerViewModel.clearHistory()
             coroutineScope.launch {
                 try {
                     val image = InputImage.fromFilePath(context, uri)
@@ -211,35 +212,52 @@ fun MedicineScannerScreen(
                                 prescriptionSaved = false
                             },
                             onChooseImage = { imagePicker.launch("image/*") },
-                            onDetectedTextChange = { scannerViewModel.updateDetectedText(it) },
+                            onDetectedTextChange = {
+                                if (it != detectedText) {
+                                    prescriptionMedicines = emptyList()
+                                    prescriptionSaved = false
+                                    prescriptionError = null
+                                }
+                                scannerViewModel.updateDetectedText(it)
+                            },
                             onSendToAI = {
+                                scannerViewModel.pauseScanning()
+                                prescriptionCapture = true
                                 val textToAnalyze = detectedText
                                 coroutineScope.launch {
                                     isParsingPrescription = true
                                     prescriptionError = null
                                     prescriptionSaved = false
+                                    prescriptionMedicines = emptyList()
                                     try {
                                         val parsed = PrescriptionParser.parse(textToAnalyze, forceAi = true)
                                         if (parsed.isEmpty()) {
                                             prescriptionError = "AI could not identify medicine rows. Edit the OCR text or upload a clearer image and try again."
                                         } else {
                                             prescriptionMedicines = parsed
-                                            val saved = medicineViewModel.insertMedicinesAndAwait(parsed).getOrElse { throw it }
-                                            prescriptionSaved = saved == parsed.size
-                                            prescriptionError = "AI extracted and added $saved medicine${if (saved == 1) "" else "s"} to Insights."
+                                            prescriptionError = "AI structured ${parsed.size} medicine${if (parsed.size == 1) "" else "s"}. Review the fields below, then save them to Insights when ready."
                                         }
                                     } catch (e: Exception) {
-                                        prescriptionError = "AI processing or saving failed: ${e.message ?: "unknown error"}"
+                                        prescriptionError = "AI processing failed: ${e.message ?: "unknown error"}"
                                     } finally {
                                         isParsingPrescription = false
                                     }
                                 }
                             },
                             onSave = {
-                                prescriptionMedicines.forEach { medicine ->
-                                    medicineViewModel.insertMedicine(medicine.name, medicine.dosage, medicine.frequency, medicine.time, medicine.duration, medicine.quantity, medicine.instructions)
+                                coroutineScope.launch {
+                                    isParsingPrescription = true
+                                    prescriptionError = null
+                                    try {
+                                        val saved = medicineViewModel.insertMedicinesAndAwait(prescriptionMedicines).getOrElse { throw it }
+                                        prescriptionSaved = saved == prescriptionMedicines.size
+                                        prescriptionError = "Saved $saved medicine${if (saved == 1) "" else "s"} to Insights."
+                                    } catch (e: Exception) {
+                                        prescriptionError = "Could not save medicines: ${e.message ?: "unknown error"}"
+                                    } finally {
+                                        isParsingPrescription = false
+                                    }
                                 }
-                                prescriptionSaved = prescriptionMedicines.isNotEmpty()
                             },
                             modifier = Modifier.fillMaxWidth().weight(1f)
                         )
@@ -330,19 +348,25 @@ private fun PrescriptionResultsSection(
             )
         }
         if (parsing) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Organizing prescription details…", style = MaterialTheme.typography.bodySmall) }
-        parseError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        parseError?.let {
+            val isStatus = it.startsWith("AI structured") || it.startsWith("Saved ")
+            Text(it, color = if (isStatus) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
         if (medicines.isEmpty() && !parsing) {
             Text(if (detectedText.isBlank()) "Point the camera at a prescription." else "No medicine rows recognized yet. Try adjusting the camera or lighting.", modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             Text("${medicines.size} medicine${if (medicines.size == 1) "" else "s"} found", modifier = Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelLarge)
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(medicines) { medicine ->
+            Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                medicines.forEach { medicine ->
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
                             Text(medicine.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text(listOf(medicine.dosage, medicine.frequency, medicine.time, medicine.duration).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Details need review" }, style = MaterialTheme.typography.bodyMedium)
-                            if (medicine.quantity.isNotBlank()) Text("Quantity: ${medicine.quantity}", style = MaterialTheme.typography.bodySmall)
-                            if (medicine.instructions.isNotBlank()) Text(medicine.instructions, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            MedicineInsightField("Dosage", medicine.dosage)
+                            MedicineInsightField("Frequency", medicine.frequency)
+                            MedicineInsightField("Time", medicine.time)
+                            MedicineInsightField("Duration", medicine.duration)
+                            MedicineInsightField("Quantity", medicine.quantity)
+                            MedicineInsightField("Instructions", medicine.instructions)
                         }
                     }
                 }
@@ -365,13 +389,21 @@ private fun PrescriptionResultsSection(
         Spacer(Modifier.height(8.dp))
         Button(onClick = onSendToAI, enabled = detectedText.isNotBlank() && !parsing && !saved, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.Psychology, null)
-            Spacer(Modifier.width(8.dp)); Text(if (parsing) "AI is analyzing…" else "Send OCR text to AI & add to Insights")
+            Spacer(Modifier.width(8.dp)); Text(if (parsing) "AI is analyzing…" else "Ask AI to structure medicines")
         }
         Spacer(Modifier.height(8.dp))
         Button(onClick = onSave, enabled = medicines.isNotEmpty() && !saved && !parsing, modifier = Modifier.fillMaxWidth()) {
             Icon(if (saved) Icons.Default.Check else Icons.Default.Add, null)
-            Spacer(Modifier.width(8.dp)); Text(if (saved) "Added to Insights" else "Add all to Insights")
+            Spacer(Modifier.width(8.dp)); Text(if (saved) "Saved to Insights" else "Save all ${medicines.size} to Insights")
         }
+    }
+}
+
+@Composable
+private fun MedicineInsightField(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(top = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("$label:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+        Text(value.ifBlank { "Not specified" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
