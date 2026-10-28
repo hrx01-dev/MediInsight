@@ -65,7 +65,7 @@ class MyApplication : Application() {
         try {
             // LLM Model - Medium-sized model for better quality (374 MB)
             addModelFromURL(
-                url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+                url = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
                 name = "Qwen 2.5 0.5B Instruct Q6_K",
                 type = "LLM"
             )
