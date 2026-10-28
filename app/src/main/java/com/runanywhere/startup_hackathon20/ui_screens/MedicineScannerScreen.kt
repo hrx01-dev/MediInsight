@@ -2,6 +2,8 @@ package com.runanywhere.startup_hackathon20.ui_screens
 
 import android.Manifest
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -18,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,11 +43,17 @@ import com.runanywhere.startup_hackathon20.viewmodel.ScannerViewModel
 import com.runanywhere.startup_hackathon20.viewmodel.SharedMedicineViewModel
 import com.runanywhere.startup_hackathon20.viewmodel.MedicineViewModel
 import com.runanywhere.startup_hackathon20.ai.PrescriptionParser
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.tasks.await
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import java.util.concurrent.Executors
 
 /**
@@ -64,6 +74,31 @@ fun MedicineScannerScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
+    var prescriptionCapture by remember { mutableStateOf(false) }
+    var prescriptionSaved by remember { mutableStateOf(false) }
+    var prescriptionMedicines by remember { mutableStateOf<List<PrescriptionParser.Medicine>>(emptyList()) }
+    var isParsingPrescription by remember { mutableStateOf(false) }
+    var prescriptionError by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null && initialPrescriptionMode) {
+            scannerViewModel.pauseScanning()
+            prescriptionCapture = true
+            prescriptionSaved = false
+            coroutineScope.launch {
+                try {
+                    val image = InputImage.fromFilePath(context, uri)
+                    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                    val result = recognizer.process(image).await()
+                    scannerViewModel.updateDetectedText(result.text)
+                    recognizer.close()
+                    if (result.text.isBlank()) prescriptionError = "No readable text found in that image. Try a clear, well-lit image."
+                } catch (e: Exception) {
+                    prescriptionError = "Could not read that image: ${e.message ?: "unknown error"}"
+                }
+            }
+        }
+    }
 
     val detectedText by scannerViewModel.detectedText.collectAsState()
     val isScanning by scannerViewModel.isScanning.collectAsState()
@@ -72,11 +107,6 @@ fun MedicineScannerScreen(
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var analyzer by remember { mutableStateOf<TextRecognitionAnalyzer?>(null) }
     var prescriptionMode by remember { mutableStateOf(initialPrescriptionMode) }
-    var prescriptionCapture by remember { mutableStateOf(false) }
-    var prescriptionSaved by remember { mutableStateOf(false) }
-    var prescriptionMedicines by remember { mutableStateOf<List<PrescriptionParser.Medicine>>(emptyList()) }
-    var isParsingPrescription by remember { mutableStateOf(false) }
-    var prescriptionError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(detectedText, prescriptionMode, prescriptionCapture) {
         if (!prescriptionMode || !prescriptionCapture || detectedText.isBlank()) return@LaunchedEffect
         val capturedText = detectedText
@@ -199,6 +229,8 @@ fun MedicineScannerScreen(
                                 prescriptionCapture = true
                                 prescriptionSaved = false
                             },
+                            onChooseImage = { imagePicker.launch("image/*") },
+                            onDetectedTextChange = { scannerViewModel.updateDetectedText(it) },
                             onSave = {
                                 prescriptionMedicines.forEach { medicine ->
                                     medicineViewModel.insertMedicine(medicine.name, medicine.dosage, medicine.frequency, medicine.time, medicine.duration, medicine.quantity, medicine.instructions)
@@ -260,6 +292,8 @@ private fun PrescriptionResultsSection(
     saved: Boolean,
     onToggleScanning: () -> Unit,
     onCapturePrescription: () -> Unit,
+    onChooseImage: () -> Unit,
+    onDetectedTextChange: (String) -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -276,6 +310,19 @@ private fun PrescriptionResultsSection(
             )
         } else {
             Text("OCR text detected · ${detectedText.length} characters", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            BasicTextField(
+                value = detectedText,
+                onValueChange = onDetectedTextChange,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp, max = 128.dp).padding(vertical = 6.dp),
+                textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                decorationBox = { inner ->
+                    Box {
+                        if (detectedText.isBlank()) Text("Recognized prescription text will appear here", style = MaterialTheme.typography.bodySmall)
+                        inner()
+                    }
+                }
+            )
         }
         if (parsing) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Organizing prescription details…", style = MaterialTheme.typography.bodySmall) }
         parseError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
@@ -304,6 +351,11 @@ private fun PrescriptionResultsSection(
         OutlinedButton(onClick = onCapturePrescription, enabled = detectedText.isNotBlank() && !parsing, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.Description, null)
             Spacer(Modifier.width(8.dp)); Text(if (parsing) "Organizing…" else "Pause & organize detected text")
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = onChooseImage, enabled = !parsing, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.PhotoLibrary, null)
+            Spacer(Modifier.width(8.dp)); Text("Choose prescription image")
         }
         Spacer(Modifier.height(8.dp))
         Button(onClick = onSave, enabled = medicines.isNotEmpty() && !saved && !parsing, modifier = Modifier.fillMaxWidth()) {
