@@ -534,6 +534,11 @@ fun ChatScreen(
                             )
                             Spacer(Modifier.height(12.dp))
 
+                            Text(statusMessage, style = MaterialTheme.typography.bodyMedium)
+                            downloadProgress?.let { progress ->
+                                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                            }
+                            Spacer(Modifier.height(8.dp))
                             availableModels.forEach { model ->
                                 val isCurrentModel = model.id == currentModelId
                                 Card(
