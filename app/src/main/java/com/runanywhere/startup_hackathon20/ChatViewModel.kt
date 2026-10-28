@@ -288,14 +288,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
                 // Load the model
                 Log.d("ChatViewModel", "Calling RunAnywhere.loadModel($modelId)")
-                val success = RunAnywhere.loadModel(modelId)
+                (getApplication<Application>() as MyApplication).awaitSdkReady()
+                val services = com.runanywhere.sdk.foundation.ServiceContainer.shared
+                val model = listAvailableModels().firstOrNull { it.id == modelId }
+                    ?: error("Selected model is not registered")
+                val component = services.llmComponent
+                component.initialize(com.runanywhere.sdk.components.llm.LLMConfiguration(
+                    modelId = modelId, contextLength = 8192, maxTokens = 2048
+                ))
+                component.loadModel(model)
+                services.streamingService.initializeWithLLMComponent(component)
+                val success = true
                 
                 if (success) {
                     Log.d("ChatViewModel", "RunAnywhere.loadModel returned success, waiting for initialization...")
                     _statusMessage.value = "Model loaded, initializing..."
                     
                     // Wait for model to initialize
-                    kotlinx.coroutines.delay(5000) // 5 second wait for initialization
+                    val probe = RunAnywhere.generate("Reply with OK.",
+                        com.runanywhere.sdk.models.RunAnywhereGenerationOptions(maxTokens = 16, temperature = 0.1f))
+                    check(probe.isNotBlank()) { "LLM initialized but the generation check returned no text" }
                     
                     // Set model as ready - trust that it loaded
                     _currentModelId.value = modelId
