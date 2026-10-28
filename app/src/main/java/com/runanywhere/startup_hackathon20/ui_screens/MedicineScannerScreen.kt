@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
@@ -98,22 +97,9 @@ fun MedicineScannerScreen(
                         return@launch
                     }
                     scannerViewModel.updateDetectedText(result.text)
-                    isParsingPrescription = true
                     prescriptionError = null
-                    val parsed = PrescriptionParser.parse(result.text)
-                    if (parsed.isEmpty()) {
-                        prescriptionError = "OCR read the image, but no medicines could be identified. Check the recognized text and try a clearer image."
-                        return@launch
-                    }
-                    prescriptionMedicines = parsed
-                    val saveResult = medicineViewModel.insertMedicinesAndAwait(parsed)
-                    val savedCount = saveResult.getOrElse { throw it }
-                    prescriptionSaved = savedCount == parsed.size
-                    if (prescriptionSaved) prescriptionError = "Added $savedCount medicine${if (savedCount == 1) "" else "s"} to Insights."
                 } catch (e: Exception) {
-                    prescriptionError = "Could not process the prescription: ${e.message ?: "unknown error"}"
-                } finally {
-                    isParsingPrescription = false
+                    prescriptionError = "Could not read that image: ${e.message ?: "unknown error"}"
                 }
             }
         }
@@ -126,30 +112,6 @@ fun MedicineScannerScreen(
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var analyzer by remember { mutableStateOf<TextRecognitionAnalyzer?>(null) }
     var prescriptionMode by remember { mutableStateOf(initialPrescriptionMode) }
-    LaunchedEffect(detectedText, prescriptionMode, prescriptionCapture) {
-        if (!prescriptionMode || !prescriptionCapture || detectedText.isBlank()) return@LaunchedEffect
-        val capturedText = detectedText
-        isParsingPrescription = true
-        prescriptionError = null
-        try {
-            val parsed = PrescriptionParser.parse(capturedText)
-            if (detectedText == capturedText && prescriptionMode && prescriptionCapture) {
-                prescriptionMedicines = parsed
-                if (parsed.isEmpty()) {
-                prescriptionError = "No medicines found in the captured text. Make sure the OCR text includes medicine names and doses, then try again."
-                }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            if (detectedText == capturedText && prescriptionMode && prescriptionCapture) {
-                prescriptionError = "Could not organize the prescription. Make sure an AI model is downloaded and loaded, then try again."
-            }
-        } finally {
-            isParsingPrescription = false
-        }
-    }
-
     // Initialize camera provider
     LaunchedEffect(Unit) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -250,6 +212,29 @@ fun MedicineScannerScreen(
                             },
                             onChooseImage = { imagePicker.launch("image/*") },
                             onDetectedTextChange = { scannerViewModel.updateDetectedText(it) },
+                            onSendToAI = {
+                                val textToAnalyze = detectedText
+                                coroutineScope.launch {
+                                    isParsingPrescription = true
+                                    prescriptionError = null
+                                    prescriptionSaved = false
+                                    try {
+                                        val parsed = PrescriptionParser.parse(textToAnalyze, forceAi = true)
+                                        if (parsed.isEmpty()) {
+                                            prescriptionError = "AI could not identify medicine rows. Edit the OCR text or upload a clearer image and try again."
+                                        } else {
+                                            prescriptionMedicines = parsed
+                                            val saved = medicineViewModel.insertMedicinesAndAwait(parsed).getOrElse { throw it }
+                                            prescriptionSaved = saved == parsed.size
+                                            prescriptionError = "AI extracted and added $saved medicine${if (saved == 1) "" else "s"} to Insights."
+                                        }
+                                    } catch (e: Exception) {
+                                        prescriptionError = "AI processing or saving failed: ${e.message ?: "unknown error"}"
+                                    } finally {
+                                        isParsingPrescription = false
+                                    }
+                                }
+                            },
                             onSave = {
                                 prescriptionMedicines.forEach { medicine ->
                                     medicineViewModel.insertMedicine(medicine.name, medicine.dosage, medicine.frequency, medicine.time, medicine.duration, medicine.quantity, medicine.instructions)
@@ -313,6 +298,7 @@ private fun PrescriptionResultsSection(
     onCapturePrescription: () -> Unit,
     onChooseImage: () -> Unit,
     onDetectedTextChange: (String) -> Unit,
+    onSendToAI: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -375,6 +361,11 @@ private fun PrescriptionResultsSection(
         OutlinedButton(onClick = onChooseImage, enabled = !parsing, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.PhotoLibrary, null)
             Spacer(Modifier.width(8.dp)); Text("Choose prescription image")
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = onSendToAI, enabled = detectedText.isNotBlank() && !parsing && !saved, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Psychology, null)
+            Spacer(Modifier.width(8.dp)); Text(if (parsing) "AI is analyzing…" else "Send OCR text to AI & add to Insights")
         }
         Spacer(Modifier.height(8.dp))
         Button(onClick = onSave, enabled = medicines.isNotEmpty() && !saved && !parsing, modifier = Modifier.fillMaxWidth()) {
