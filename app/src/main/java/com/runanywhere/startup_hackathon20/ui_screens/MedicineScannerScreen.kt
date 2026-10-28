@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,6 +37,10 @@ import com.runanywhere.startup_hackathon20.ocr.TextRecognitionAnalyzer
 import com.runanywhere.startup_hackathon20.viewmodel.ScannerViewModel
 import com.runanywhere.startup_hackathon20.viewmodel.SharedMedicineViewModel
 import com.runanywhere.startup_hackathon20.viewmodel.MedicineViewModel
+import com.runanywhere.startup_hackathon20.ai.PrescriptionParser
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import java.util.concurrent.Executors
@@ -68,8 +71,21 @@ fun MedicineScannerScreen(
     var analyzer by remember { mutableStateOf<TextRecognitionAnalyzer?>(null) }
     var prescriptionMode by remember { mutableStateOf(false) }
     var prescriptionSaved by remember { mutableStateOf(false) }
-    val prescriptionMedicines = remember(detectedText, prescriptionMode) {
-        if (prescriptionMode) parsePrescriptionMedicines(detectedText) else emptyList()
+    var prescriptionMedicines by remember { mutableStateOf<List<PrescriptionParser.Medicine>>(emptyList()) }
+    var isParsingPrescription by remember { mutableStateOf(false) }
+    var prescriptionError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(detectedText, prescriptionMode, lifecycleOwner) {
+        if (!prescriptionMode || detectedText.isBlank()) {
+            prescriptionMedicines = emptyList()
+            return@LaunchedEffect
+        }
+        isParsingPrescription = true
+        prescriptionError = null
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            prescriptionMedicines = PrescriptionParser.parse(detectedText)
+            if (prescriptionMedicines.isEmpty()) prescriptionError = "No medicines could be confidently extracted. Keep the medicine rows clear and try again."
+            isParsingPrescription = false
+        }
     }
 
     // Initialize camera provider
@@ -158,7 +174,7 @@ fun MedicineScannerScreen(
                             onToggleScanning = { scannerViewModel.toggleScanning() },
                             onSave = {
                                 prescriptionMedicines.forEach { medicine ->
-                                    medicineViewModel.insertMedicine(medicine.name, medicine.dosage, medicine.frequency, "", medicine.duration, medicine.quantity, medicine.instructions)
+                                    medicineViewModel.insertMedicine(medicine.name, medicine.dosage, medicine.frequency, medicine.time, medicine.duration, medicine.quantity, medicine.instructions)
                                 }
                                 prescriptionSaved = prescriptionMedicines.isNotEmpty()
                             },
@@ -206,54 +222,14 @@ What is this medicine used for? (Brief answer)"""
     }
 }
 
-private data class PrescriptionMedicine(
-    val name: String,
-    val dosage: String = "",
-    val frequency: String = "",
-    val duration: String = "",
-    val quantity: String = "",
-    val instructions: String = ""
-)
-
-/** Split OCR text into medicine-like rows and attach nearby prescription instructions. */
-private fun parsePrescriptionMedicines(text: String): List<PrescriptionMedicine> {
-    val lines = text.lines().map { it.replace(Regex("\\s+"), " ").trim() }.filter { it.isNotBlank() }
-    val dosageRegex = Regex("(?i)\\b\\d+(?:\\.\\d+)?\\s*(?:mg|mcg|µg|g|ml|mL|IU|units?)\\b")
-    val frequencyRegex = Regex("(?i)\\b(?:once|twice|thrice|\\d+\\s*(?:times|x)\\s*(?:a|per)\\s*day|every\\s*\\d+\\s*hours?|OD|BD|BID|TID|QID|HS|SOS)\\b")
-    val durationRegex = Regex("(?i)\\b\\d+\\s*(?:days?|weeks?|months?)\\b")
-    val dosageFormRegex = Regex("(?i)\\b(?:tab(?:let)?s?|cap(?:sule)?s?|syrup|suspension|injection|inj|cream|ointment|drops?)\\b")
-    val stopWords = Regex("(?i)\\b(?:patient|doctor|dr|date|age|address|phone|hospital|clinic|diagnosis|prescription|rx|signature|registration|reg|follow.?up|allergy|complaint|history|mrn|name)\\b")
-    val result = mutableListOf<PrescriptionMedicine>()
-    lines.forEach { line ->
-        val doseMatch = dosageRegex.find(line)
-        val formMatch = dosageFormRegex.find(line)
-        val hasMedicineEvidence = doseMatch != null || formMatch != null
-        if (!hasMedicineEvidence || stopWords.containsMatchIn(line)) return@forEach
-
-        val boundary = listOfNotNull(doseMatch?.range?.first, formMatch?.range?.first).minOrNull() ?: return@forEach
-        val prefix = line.substring(0, boundary).trim().trimEnd(':', '-', '.', ',', ';', ')')
-        val name = prefix.replace(Regex("(?i)^(?:\\d+[.)]?\\s*|(?:tab|tablet|cap|capsule)\\s+)"), "").trim()
-        if (name.length < 2 || name.split(Regex("\\s+")).size > 5 || stopWords.containsMatchIn(name)) return@forEach
-
-        val dosage = listOfNotNull(doseMatch?.value, formMatch?.value).joinToString(" ").trim()
-        val frequency = frequencyRegex.find(line)?.value.orEmpty()
-        val duration = durationRegex.find(line)?.value.orEmpty()
-        val quantity = Regex("(?i)\\b(?:qty|quantity)\\s*[:.-]?\\s*(\\d+)\\b").find(line)?.groupValues?.get(1)?.let { "$it units" }.orEmpty()
-        val instructionBits = buildList {
-            Regex("(?i)\\b(?:after|before|with)\\s+(?:food|meals?|breakfast|lunch|dinner)\\b|\\bon empty stomach\\b|\\b(?:morning|afternoon|evening|night|bedtime)\\b")
-                .findAll(line).forEach { add(it.value) }
-        }.distinct()
-        result.add(PrescriptionMedicine(name, dosage, frequency, "", duration, quantity, instructionBits.joinToString("; ")))
-    }
-    return result.distinctBy { it.name.lowercase() }
-}
-
 @Composable
 private fun PrescriptionResultsSection(
     detectedText: String,
-    medicines: List<PrescriptionMedicine>,
+    medicines: List<PrescriptionParser.Medicine>,
     isScanning: Boolean,
     error: String?,
+    parsing: Boolean,
+    parseError: String?,
     saved: Boolean,
     onToggleScanning: () -> Unit,
     onSave: () -> Unit,
@@ -263,7 +239,9 @@ private fun PrescriptionResultsSection(
         Text("Prescription medicines", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text("Keep the full prescription in view. Review the recognized entries before saving.", style = MaterialTheme.typography.bodySmall)
         if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
-        if (medicines.isEmpty()) {
+        if (parsing) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Organizing prescription details…", style = MaterialTheme.typography.bodySmall) }
+        parseError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        if (medicines.isEmpty() && !parsing) {
             Text(if (detectedText.isBlank()) "Point the camera at a prescription." else "No medicine rows recognized yet. Try adjusting the camera or lighting.", modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             Text("${medicines.size} medicine${if (medicines.size == 1) "" else "s"} found", modifier = Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelLarge)
@@ -272,7 +250,7 @@ private fun PrescriptionResultsSection(
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
                             Text(medicine.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text(listOf(medicine.dosage, medicine.frequency, medicine.duration).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Details need review" }, style = MaterialTheme.typography.bodyMedium)
+                            Text(listOf(medicine.dosage, medicine.frequency, medicine.time, medicine.duration).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Details need review" }, style = MaterialTheme.typography.bodyMedium)
                             if (medicine.quantity.isNotBlank()) Text("Quantity: ${medicine.quantity}", style = MaterialTheme.typography.bodySmall)
                             if (medicine.instructions.isNotBlank()) Text(medicine.instructions, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -285,7 +263,7 @@ private fun PrescriptionResultsSection(
             Spacer(Modifier.width(8.dp)); Text(if (isScanning) "Pause scanning" else "Resume scanning")
         }
         Spacer(Modifier.height(8.dp))
-        Button(onClick = onSave, enabled = medicines.isNotEmpty() && !saved, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = onSave, enabled = medicines.isNotEmpty() && !saved && !parsing, modifier = Modifier.fillMaxWidth()) {
             Icon(if (saved) Icons.Default.Check else Icons.Default.Add, null)
             Spacer(Modifier.width(8.dp)); Text(if (saved) "Added to Insights" else "Add all to Insights")
         }
