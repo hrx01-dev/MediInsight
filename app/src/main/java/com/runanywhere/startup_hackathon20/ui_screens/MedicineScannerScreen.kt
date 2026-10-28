@@ -16,8 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,7 +40,6 @@ import com.runanywhere.startup_hackathon20.viewmodel.SharedMedicineViewModel
 import com.runanywhere.startup_hackathon20.viewmodel.MedicineViewModel
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.ui.text.style.TextOverflow
 import java.util.concurrent.Executors
 
 /**
@@ -221,29 +218,32 @@ private data class PrescriptionMedicine(
 /** Split OCR text into medicine-like rows and attach nearby prescription instructions. */
 private fun parsePrescriptionMedicines(text: String): List<PrescriptionMedicine> {
     val lines = text.lines().map { it.replace(Regex("\\s+"), " ").trim() }.filter { it.isNotBlank() }
-    val medicinePattern = Regex("(?i)([A-Za-z][A-Za-z0-9+.-]*(?:\\s+[A-Za-z][A-Za-z0-9+.-]*){0,3})\\s+((?:\\d+(?:\\.\\d+)?\\s*)(?:mg|mcg|g|ml|%)\\b.*)?")
-    val frequencyPattern = Regex("(?i)(once|twice|thrice|\\d+\\s*(?:times|x)\\s*(?:a|per)\\s*day|\\b(?:OD|BD|BID|TID|QID|HS|SOS)\\b)")
-    val durationPattern = Regex("(?i)(?:for\\s*)?(\\d+\\s*(?:days?|weeks?|months?))")
+    val dosageRegex = Regex("(?i)\\b\\d+(?:\\.\\d+)?\\s*(?:mg|mcg|µg|g|ml|mL|IU|units?)\\b")
+    val frequencyRegex = Regex("(?i)\\b(?:once|twice|thrice|\\d+\\s*(?:times|x)\\s*(?:a|per)\\s*day|every\\s*\\d+\\s*hours?|OD|BD|BID|TID|QID|HS|SOS)\\b")
+    val durationRegex = Regex("(?i)\\b\\d+\\s*(?:days?|weeks?|months?)\\b")
+    val dosageFormRegex = Regex("(?i)\\b(?:tab(?:let)?s?|cap(?:sule)?s?|syrup|suspension|injection|inj|cream|ointment|drops?)\\b")
+    val stopWords = Regex("(?i)\\b(?:patient|doctor|dr|date|age|address|phone|hospital|clinic|diagnosis|prescription|rx|signature|registration|reg|follow.?up|allergy|complaint|history|mrn|name)\\b")
     val result = mutableListOf<PrescriptionMedicine>()
     lines.forEach { line ->
-        val match = medicinePattern.find(line)
-        val looksLikeMedicine = match != null && (Regex("\\d").containsMatchIn(line) || Regex("(?i)\\b(tab|tablet|cap|capsule|syrup|inj|cream|drops?)\\b").containsMatchIn(line))
-        if (looksLikeMedicine) {
-            val name = match!!.groupValues[1].trim().takeIf { it.length > 1 } ?: return@forEach
-            val dose = Regex("(?i)\\d+(?:\\.\\d+)?\\s*(?:mg|mcg|g|ml|%)").find(line)?.value.orEmpty()
-            val frequency = frequencyPattern.find(line)?.value.orEmpty()
-            val duration = durationPattern.find(line)?.groupValues?.get(1).orEmpty()
-            val quantity = Regex("(?i)(?:qty|quantity)\\s*[:.-]?\\s*(\\d+)").find(line)?.groupValues?.get(1).orEmpty()
-            val instructions = line.substringAfter(dose, "").trim(' ', '-', ',', ';')
-            result.add(PrescriptionMedicine(name, dose, frequency, duration, quantity, instructions))
-        } else if (result.isNotEmpty() && (frequencyPattern.containsMatchIn(line) || durationPattern.containsMatchIn(line) || Regex("(?i)\\b(after food|before food|with food|empty stomach|morning|night)\\b").containsMatchIn(line))) {
-            val previous = result.last()
-            result[result.lastIndex] = previous.copy(
-                frequency = previous.frequency.ifBlank { frequencyPattern.find(line)?.value.orEmpty() },
-                duration = previous.duration.ifBlank { durationPattern.find(line)?.groupValues?.get(1).orEmpty() },
-                instructions = listOf(previous.instructions, line).filter { it.isNotBlank() }.distinct().joinToString("; ")
-            )
-        }
+        val doseMatch = dosageRegex.find(line)
+        val formMatch = dosageFormRegex.find(line)
+        val hasMedicineEvidence = doseMatch != null || formMatch != null
+        if (!hasMedicineEvidence || stopWords.containsMatchIn(line)) return@forEach
+
+        val boundary = listOfNotNull(doseMatch?.range?.first, formMatch?.range?.first).minOrNull() ?: return@forEach
+        val prefix = line.substring(0, boundary).trim().trimEnd(':', '-', '.', ',', ';', ')')
+        val name = prefix.replace(Regex("(?i)^(?:\\d+[.)]?\\s*|(?:tab|tablet|cap|capsule)\\s+)"), "").trim()
+        if (name.length < 2 || name.split(Regex("\\s+")).size > 5 || stopWords.containsMatchIn(name)) return@forEach
+
+        val dosage = listOfNotNull(doseMatch?.value, formMatch?.value).joinToString(" ").trim()
+        val frequency = frequencyRegex.find(line)?.value.orEmpty()
+        val duration = durationRegex.find(line)?.value.orEmpty()
+        val quantity = Regex("(?i)\\b(?:qty|quantity)\\s*[:.-]?\\s*(\\d+)\\b").find(line)?.groupValues?.get(1)?.let { "$it units" }.orEmpty()
+        val instructionBits = buildList {
+            Regex("(?i)\\b(?:after|before|with)\\s+(?:food|meals?|breakfast|lunch|dinner)\\b|\\bon empty stomach\\b|\\b(?:morning|afternoon|evening|night|bedtime)\\b")
+                .findAll(line).forEach { add(it.value) }
+        }.distinct()
+        result.add(PrescriptionMedicine(name, dosage, frequency, "", duration, quantity, instructionBits.joinToString("; ")))
     }
     return result.distinctBy { it.name.lowercase() }
 }
@@ -273,6 +273,7 @@ private fun PrescriptionResultsSection(
                         Column(Modifier.padding(12.dp)) {
                             Text(medicine.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                             Text(listOf(medicine.dosage, medicine.frequency, medicine.duration).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Details need review" }, style = MaterialTheme.typography.bodyMedium)
+                            if (medicine.quantity.isNotBlank()) Text("Quantity: ${medicine.quantity}", style = MaterialTheme.typography.bodySmall)
                             if (medicine.instructions.isNotBlank()) Text(medicine.instructions, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
