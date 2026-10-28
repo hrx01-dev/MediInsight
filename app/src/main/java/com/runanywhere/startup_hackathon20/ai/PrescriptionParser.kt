@@ -45,7 +45,7 @@ Rules:
 - Use only the keys in the schema. Do not include markdown, explanations, or text outside the JSON object.
 
 OCR text:
-${ocrText.take(6000)}""".trimIndent()
+${ocrText}""".trimIndent()
         try {
         val response = RunAnywhere.generate(prompt)
             val json = response.substringAfter('{', "").let { if (it.isNotEmpty()) "{$it" else "" }
