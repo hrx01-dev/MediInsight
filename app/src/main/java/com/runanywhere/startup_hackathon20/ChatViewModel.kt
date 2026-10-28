@@ -122,7 +122,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var downloadingModel = false
+    private var loadingModel = false
+
+    fun prepareModelForPreset() {
+        if (_isModelVerified.value || downloadingModel || loadingModel) return
+        val model = _availableModels.value.firstOrNull { it.isDownloaded }
+            ?: _availableModels.value.firstOrNull() ?: return
+        if (model.isDownloaded) loadModel(model.id) else downloadModel(model.id)
+    }
+
     fun downloadModel(modelId: String) {
+        if (downloadingModel || loadingModel) return
+        downloadingModel = true
         viewModelScope.launch {
             try {
                 _statusMessage.value = "Downloading model..."
@@ -141,11 +153,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _statusMessage.value = "Download failed: ${e.message}"
                 _downloadProgress.value = null
+            } finally {
+                downloadingModel = false
             }
         }
     }
 
     fun loadModel(modelId: String) {
+        if (loadingModel) return
+        loadingModel = true
         viewModelScope.launch {
             try {
                 Log.d("ChatViewModel", "=== LOADING MODEL: $modelId ===")
@@ -200,6 +216,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 _statusMessage.value = "Error: ${e.message}"
                 _currentModelId.value = null
                 _isModelVerified.value = false
+            } finally {
+                loadingModel = false
             }
         }
     }
