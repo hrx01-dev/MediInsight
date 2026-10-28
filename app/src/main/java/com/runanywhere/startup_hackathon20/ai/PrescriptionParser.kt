@@ -2,7 +2,9 @@ package com.runanywhere.startup_hackathon20.ai
 
 import android.util.Log
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 import com.runanywhere.sdk.public.RunAnywhere
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -44,29 +46,72 @@ Return only this JSON structure with one object for each medicine, without markd
 OCR text:
 $ocrText""".trimIndent()
 
-    suspend fun parse(ocrText: String, forceAi: Boolean = false): List<Medicine> = withContext(Dispatchers.IO) {
-        if (ocrText.isBlank()) return@withContext emptyList()
+    data class Analysis(val medicines: List<Medicine>, val rawResponse: String)
+
+    suspend fun analyze(ocrText: String): Analysis = withContext(Dispatchers.IO) {
+        require(ocrText.isNotBlank()) { "No OCR text was received" }
+        val response = StringBuilder()
+        // Use the same streaming generation path as normal chat.
+        RunAnywhere.generateStream(buildPrompt(ocrText)).collect { token -> response.append(token) }
+        val raw = response.toString().trim()
+        check(raw.isNotBlank()) { "The model returned an empty response. Please retry." }
+        Analysis(decodeResponse(raw), raw)
+    }
+
+    suspend fun parse(ocrText: String, forceAi: Boolean = false): List<Medicine> {
+        if (ocrText.isBlank()) return emptyList()
         if (!forceAi) {
-            val tableMedicines = parseTabularFallback(ocrText)
-            if (tableMedicines.isNotEmpty()) return@withContext tableMedicines
+            val fallback = parseTabularFallback(ocrText)
+            if (fallback.isNotEmpty()) return fallback
         }
-        val prompt = buildPrompt(ocrText)
-        try {
-        val response = RunAnywhere.generate(prompt)
-            val json = response.substringAfter('{', "").let { if (it.isNotEmpty()) "{$it" else "" }
-            if (json.isBlank()) return@withContext parseTabularFallback(ocrText)
-            val result = runCatching { gson.fromJson(json, Result::class.java) }.getOrNull()
-            val modelMedicines = result?.medicines.orEmpty().filter { medicine ->
-                val name = medicine.name.trim()
-                name.length >= 2 && !nonMedicineHeadings.containsMatchIn(name) &&
-                    (ocrText.contains(name, ignoreCase = true) ||
-                        medicineEvidence.containsMatchIn(name + " " + medicine.dosage) || medicine.frequency.isNotBlank())
+        return analyze(ocrText).medicines
+    }
+
+    /** Accept JSON surrounded by prose/fences, root arrays, and null optional fields. */
+    fun decodeResponse(response: String): List<Medicine> {
+        val start = response.indexOfFirst { it == '{' || it == '[' }
+        if (start < 0) return emptyList()
+        val opening = response[start]
+        val closing = if (opening == '{') '}' else ']'
+        var depth = 0
+        var quoted = false
+        var escaped = false
+        var end = -1
+        for (index in start until response.length) {
+            val c = response[index]
+            if (quoted) {
+                if (escaped) escaped = false
+                else if (c == '\\') escaped = true
+                else if (c == '"') quoted = false
+            } else {
+                if (c == '"') quoted = true
+                else if (c == opening) depth++
+                else if (c == closing && --depth == 0) { end = index; break }
             }
-            (modelMedicines.ifEmpty { parseTabularFallback(ocrText) }).distinctBy { it.name.lowercase() }
-        } catch (e: Exception) {
-            Log.e("PrescriptionParser", "Could not structure prescription OCR", e)
-            parseTabularFallback(ocrText)
         }
+        if (end < 0) return emptyList()
+        val root = runCatching { JsonParser.parseString(response.substring(start, end + 1)) }.getOrNull()
+            ?: return emptyList()
+        val rows = when {
+            root.isJsonArray -> root.asJsonArray
+            root.isJsonObject -> {
+                val obj = root.asJsonObject
+                listOf("medicines", "medications").mapNotNull { obj.get(it) }
+                    .firstOrNull { it.isJsonArray }?.asJsonArray
+            }
+            else -> null
+        } ?: return emptyList()
+        return rows.mapNotNull { row ->
+            if (!row.isJsonObject) return@mapNotNull null
+            val obj = row.asJsonObject
+            fun field(vararg keys: String): String = keys.asSequence().mapNotNull { key ->
+                obj.get(key)?.takeIf { it.isJsonPrimitive }?.asString?.trim()?.takeIf { it.isNotEmpty() }
+            }.firstOrNull().orEmpty()
+            val name = field("name", "medicine", "medicine_name", "medication")
+            if (name.length < 2 || nonMedicineHeadings.containsMatchIn(name)) return@mapNotNull null
+            Medicine(name, field("dosage", "dose"), field("frequency"), field("time", "timing"),
+                field("duration"), field("quantity"), field("instructions"))
+        }.distinct()
     }
 
     /** Handles clear printed tables when the local model returns malformed or empty JSON. */
