@@ -143,10 +143,30 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 _statusMessage.value = "Downloading model..."
                 (getApplication<Application>() as MyApplication).awaitSdkReady()
+                val model = listAvailableModels().firstOrNull { it.id == modelId }
+                    ?: error("Model is missing from the SDK registry")
                 kotlinx.coroutines.withTimeout(30 * 60 * 1000L) {
-                    RunAnywhere.downloadModel(modelId).collect { progress ->
-                        _downloadProgress.value = progress
-                        _statusMessage.value = "Downloading: ${(progress * 100).toInt()}%"
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        // Await the download result; collecting the progress stream alone
+                        // can finish even when the underlying download task failed.
+                        val path = com.runanywhere.sdk.foundation.ServiceContainer.shared
+                            .downloadService.downloadModel(model) { progress ->
+                                val fraction = if (progress.totalBytes > 0)
+                                    progress.bytesDownloaded.toFloat() / progress.totalBytes else 0f
+                                _downloadProgress.value = fraction.coerceIn(0f, 1f)
+                                _statusMessage.value = "Downloading: ${progress.bytesDownloaded / 1048576} MB"
+                            }
+                        val file = java.io.File(path)
+                        check(file.isFile && file.length() > 4) {
+                            "Download returned without a model file"
+                        }
+                        val magic = ByteArray(4)
+                        java.io.FileInputStream(file).use { input ->
+                            check(input.read(magic) == 4 && magic.contentEquals(byteArrayOf(71, 71, 85, 70))) {
+                                "Downloaded file is not a GGUF model"
+                            }
+                        }
+                        RunAnywhere.scanForDownloadedModels()
                     }
                 }
                 _downloadProgress.value = null
