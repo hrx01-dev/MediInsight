@@ -332,8 +332,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val prompt = com.runanywhere.startup_hackathon20.ai.PrescriptionParser.buildPrompt(ocrText)
             val timestamp = System.currentTimeMillis()
             repository.insertMessage(ChatMessageEntity(userId = userId, text = prompt, isUser = true, timestamp = timestamp), userId)
-            val medicines = com.runanywhere.startup_hackathon20.ai.PrescriptionParser.parse(ocrText, forceAi = true)
-            val response = if (medicines.isEmpty()) "No medicines could be structured. Please check the OCR text."
+            val analysis = com.runanywhere.startup_hackathon20.ai.PrescriptionParser.analyze(ocrText)
+            val medicines = analysis.medicines
+            val response = if (medicines.isEmpty()) analysis.rawResponse + "\n\nThis response could not be converted into medicine fields. Nothing has been saved."
                 else medicines.joinToString("\n\n") { medicine ->
                     listOf("Medicine: ${medicine.name}", "Dosage: ${medicine.dosage.ifBlank { "Not specified" }}",
                         "Frequency: ${medicine.frequency.ifBlank { "Not specified" }}",
