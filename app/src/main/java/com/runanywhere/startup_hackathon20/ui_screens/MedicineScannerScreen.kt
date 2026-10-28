@@ -223,26 +223,7 @@ fun MedicineScannerScreen(
                             onSendToAI = {
                                 scannerViewModel.pauseScanning()
                                 prescriptionCapture = true
-                                val textToAnalyze = detectedText
-                                coroutineScope.launch {
-                                    isParsingPrescription = true
-                                    prescriptionError = null
-                                    prescriptionSaved = false
-                                    prescriptionMedicines = emptyList()
-                                    try {
-                                        val parsed = PrescriptionParser.parse(textToAnalyze, forceAi = true)
-                                        if (parsed.isEmpty()) {
-                                            prescriptionError = "AI could not identify medicine rows. Edit the OCR text or upload a clearer image and try again."
-                                        } else {
-                                            prescriptionMedicines = parsed
-                                            prescriptionError = "AI structured ${parsed.size} medicine${if (parsed.size == 1) "" else "s"}. Review the fields below, then save them to Insights when ready."
-                                        }
-                                    } catch (e: Exception) {
-                                        prescriptionError = "AI processing failed: ${e.message ?: "unknown error"}"
-                                    } finally {
-                                        isParsingPrescription = false
-                                    }
-                                }
+                                onNavigateToChat("Structure all medicines from this prescription OCR:\n" + detectedText)
                             },
                             onSave = {
                                 coroutineScope.launch {
