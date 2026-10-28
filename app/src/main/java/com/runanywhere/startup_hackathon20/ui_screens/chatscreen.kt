@@ -126,7 +126,7 @@ fun ChatScreen(
                 prescriptionBusy = true
                 try {
                     structuredMedicines = viewModel.sendPrescriptionMessage(prescriptionText)
-                    prescriptionStatus = if (structuredMedicines.isEmpty()) "No medicines identified. Check the OCR text and try again." else "Review these fields before saving."
+                    prescriptionStatus = if (structuredMedicines.isEmpty()) "The AI response is shown in chat. No saveable medicine fields were returned." else "Review these fields before saving."
                 } catch (e: Exception) {
                     prescriptionStatus = "Could not structure prescription: ${e.message}"
                 } finally {
