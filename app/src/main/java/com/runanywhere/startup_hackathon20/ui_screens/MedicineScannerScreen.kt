@@ -70,22 +70,18 @@ fun MedicineScannerScreen(
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var analyzer by remember { mutableStateOf<TextRecognitionAnalyzer?>(null) }
     var prescriptionMode by remember { mutableStateOf(false) }
+    var prescriptionCapture by remember { mutableStateOf(false) }
     var prescriptionSaved by remember { mutableStateOf(false) }
     var prescriptionMedicines by remember { mutableStateOf<List<PrescriptionParser.Medicine>>(emptyList()) }
     var isParsingPrescription by remember { mutableStateOf(false) }
     var prescriptionError by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(detectedText, prescriptionMode, lifecycleOwner) {
-        if (!prescriptionMode || detectedText.isBlank()) {
-            prescriptionMedicines = emptyList()
-            return@LaunchedEffect
-        }
+    LaunchedEffect(detectedText, prescriptionMode, prescriptionCapture) {
+        if (!prescriptionMode || !prescriptionCapture || detectedText.isBlank()) return@LaunchedEffect
         isParsingPrescription = true
         prescriptionError = null
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            prescriptionMedicines = PrescriptionParser.parse(detectedText)
-            if (prescriptionMedicines.isEmpty()) prescriptionError = "No medicines could be confidently extracted. Keep the medicine rows clear and try again."
-            isParsingPrescription = false
-        }
+        prescriptionMedicines = PrescriptionParser.parse(detectedText)
+        if (prescriptionMedicines.isEmpty()) prescriptionError = "No medicines could be confidently extracted. Keep the medicine rows clear and try again."
+        isParsingPrescription = false
     }
 
     // Initialize camera provider
@@ -130,7 +126,14 @@ fun MedicineScannerScreen(
         ) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = !prescriptionMode, onClick = { prescriptionMode = false; prescriptionSaved = false }, label = { Text("Medicine") }, leadingIcon = { Icon(Icons.Default.Medication, null) })
-                FilterChip(selected = prescriptionMode, onClick = { prescriptionMode = true; prescriptionSaved = false }, label = { Text("Prescription") }, leadingIcon = { Icon(Icons.Default.Description, null) })
+                FilterChip(selected = prescriptionMode, onClick = {
+                    prescriptionMode = true
+                    if (isScanning) scannerViewModel.pauseScanning()
+                    prescriptionCapture = false
+                    prescriptionSaved = false
+                    prescriptionMedicines = emptyList()
+                    scannerViewModel.clearHistory()
+                }, label = { Text("Prescription") }, leadingIcon = { Icon(Icons.Default.Description, null) })
             }
             when {
                 cameraPermissionState.status.isGranted -> {
@@ -144,9 +147,9 @@ fun MedicineScannerScreen(
                             context = context,
                             lifecycleOwner = lifecycleOwner,
                             cameraProvider = cameraProvider,
-                            isScanning = isScanning,
+                            isScanning = isScanning && (!prescriptionMode || !prescriptionCapture),
                             onTextDetected = { text ->
-                                scannerViewModel.updateDetectedText(text)
+                                if (!prescriptionMode || prescriptionCapture) scannerViewModel.updateDetectedText(text)
                             },
                             onError = { exception ->
                                 scannerViewModel.setError(exception.message ?: "Unknown error")
@@ -170,8 +173,15 @@ fun MedicineScannerScreen(
                             medicines = prescriptionMedicines,
                             isScanning = isScanning,
                             error = error,
+                            parsing = isParsingPrescription,
+                            parseError = prescriptionError,
                             saved = prescriptionSaved,
                             onToggleScanning = { scannerViewModel.toggleScanning() },
+                            onCapturePrescription = {
+                                if (isScanning) scannerViewModel.pauseScanning()
+                                prescriptionCapture = true
+                                prescriptionSaved = false
+                            },
                             onSave = {
                                 prescriptionMedicines.forEach { medicine ->
                                     medicineViewModel.insertMedicine(medicine.name, medicine.dosage, medicine.frequency, medicine.time, medicine.duration, medicine.quantity, medicine.instructions)
@@ -232,6 +242,7 @@ private fun PrescriptionResultsSection(
     parseError: String?,
     saved: Boolean,
     onToggleScanning: () -> Unit,
+    onCapturePrescription: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -261,6 +272,11 @@ private fun PrescriptionResultsSection(
         Button(onClick = onToggleScanning, modifier = Modifier.fillMaxWidth()) {
             Icon(if (isScanning) Icons.Default.Pause else Icons.Default.PlayArrow, null)
             Spacer(Modifier.width(8.dp)); Text(if (isScanning) "Pause scanning" else "Resume scanning")
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = onCapturePrescription, enabled = detectedText.isNotBlank() && !parsing, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Description, null)
+            Spacer(Modifier.width(8.dp)); Text("Use detected prescription text")
         }
         Spacer(Modifier.height(8.dp))
         Button(onClick = onSave, enabled = medicines.isNotEmpty() && !saved && !parsing, modifier = Modifier.fillMaxWidth()) {
