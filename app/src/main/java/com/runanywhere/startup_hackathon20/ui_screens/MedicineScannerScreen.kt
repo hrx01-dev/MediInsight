@@ -243,7 +243,7 @@ private fun parsePrescriptionMedicines(text: String): List<PrescriptionMedicine>
             Regex("(?i)\\b(?:after|before|with)\\s+(?:food|meals?|breakfast|lunch|dinner)\\b|\\bon empty stomach\\b|\\b(?:morning|afternoon|evening|night|bedtime)\\b")
                 .findAll(line).forEach { add(it.value) }
         }.distinct()
-        result.add(PrescriptionMedicine(name, dosage, frequency, "", duration, quantity, instructionBits.joinToString("; ")))
+        result.add(PrescriptionMedicine(name, dosage, frequency, duration, quantity, instructionBits.joinToString("; ")))
     }
     return result.distinctBy { it.name.lowercase() }
 }
