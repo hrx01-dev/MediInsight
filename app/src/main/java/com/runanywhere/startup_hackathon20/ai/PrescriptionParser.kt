@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -50,11 +51,29 @@ $ocrText""".trimIndent()
 
     suspend fun analyze(ocrText: String): Analysis = withContext(Dispatchers.IO) {
         require(ocrText.isNotBlank()) { "No OCR text was received" }
+        val prompt = buildPrompt(ocrText)
+        val options = RunAnywhereGenerationOptions(
+            maxTokens = 2048,
+            temperature = 0.1f,
+            contextLength = 8192,
+            streamingEnabled = true,
+            systemPrompt = "Extract prescription medicine details from the user text. Return the requested JSON."
+        )
         val response = StringBuilder()
-        // Use the same streaming generation path as normal chat.
-        RunAnywhere.generateStream(buildPrompt(ocrText)).collect { token -> response.append(token) }
-        val raw = response.toString().trim()
-        check(raw.isNotBlank()) { "The model returned an empty response. Please retry." }
+        kotlinx.coroutines.withTimeout(180000L) {
+            RunAnywhere.generateStream(prompt, options).collect { token -> response.append(token) }
+        }
+        var raw = response.toString().trim()
+        if (raw.isBlank()) {
+            // Some SDK backends finish the stream without emitting token callbacks.
+            // Retry once using the completed generation result and the same prompt.
+            raw = kotlinx.coroutines.withTimeout(180000L) {
+                RunAnywhere.generate(prompt, options.copy(streamingEnabled = false))
+            }.trim()
+        }
+        check(raw.isNotBlank()) {
+            "The AI runtime produced no text in either streaming or completed generation. Open normal Chat and send 'Say hello' to check whether this model can generate at all."
+        }
         Analysis(decodeResponse(raw), raw)
     }
 
