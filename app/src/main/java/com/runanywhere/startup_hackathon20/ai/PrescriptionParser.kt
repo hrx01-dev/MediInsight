@@ -22,6 +22,7 @@ object PrescriptionParser {
     private val gson = Gson()
     private val medicineEvidence = Regex("(?i)\\b(?:mg|mcg|µg|g|ml|iu|units?|tablet|tablets|tab|tabs|capsule|capsules|cap|caps|syrup|injection|inj|drops?)\\b|\\b\\d+\\s*(?:tablet|tablets|tab|tabs|capsule|capsules|cap|caps)\\b")
     private val nonMedicineHeadings = Regex("(?i)\\b(?:prescription|template|prescription no|prescription date|patient information|patient|name|age|phone|email|address|date of birth|gender|allergies|health condition|list of prescribed medications|medication name|purpose|dosage|dose|route|frequency|physician|signature|registration|diagnosis)\\b")
+    private val ignoredTerms = Regex("(?i)\\b(?:oral|intravenous|topical|purpose|infection|immune system|fever|phlegm)\\b")
 
     suspend fun parse(ocrText: String): List<Medicine> = withContext(Dispatchers.IO) {
         if (ocrText.isBlank()) return@withContext emptyList()
@@ -109,17 +110,16 @@ ${ocrText.take(6000)}""".trimIndent()
                 val name = cellLines[nameIndex]
                 if (name.length < 2 || name.split(Regex("\\s+")).size > 4 || nonMedicineHeadings.containsMatchIn(name)) return@mapNotNull null
                 val purpose = cellLines.getOrNull(nameIndex + 1).orEmpty()
-                if (ignored.containsMatchIn(purpose) || purpose.split(Regex("\\s+")).size >= 2) return@mapNotNull null
+                if (ignoredTerms.containsMatchIn(purpose) || purpose.split(Regex("\\s+")).size >= 2) return@mapNotNull null
                 Medicine(name = name, dosage = doseRegex.find(cellLines[doseIndex])?.value.orEmpty(), frequency = frequencyRegex.find(cellLines[frequencyIndex])?.value.orEmpty())
             }.distinctBy { it.name.lowercase() }
         }
-        val ignored = Regex("(?i)\\b(?:oral|intravenous|topical|purpose|infection|immune system|fever|phlegm)\\b")
         return text.lines().drop(header + 1).mapNotNull { raw ->
             val line = raw.replace(Regex("\\s+"), " ").trim().trim('|', '│', '¦', '•', '-', ' ')
             val frequency = frequencyRegex.find(line)?.value ?: return@mapNotNull null
             val dose = doseRegex.find(line)?.value ?: return@mapNotNull null
             val name = line.substringBefore(dose).trim().trim('|', '│', '¦', '•', '-', ' ')
-            if (name.length < 2 || name.split(Regex("\\s+")).size > 4 || nonMedicineHeadings.containsMatchIn(name) || ignored.containsMatchIn(name)) return@mapNotNull null
+            if (name.length < 2 || name.split(Regex("\\s+")).size > 4 || nonMedicineHeadings.containsMatchIn(name) || ignoredTerms.containsMatchIn(name)) return@mapNotNull null
             Medicine(name = name, dosage = dose, frequency = frequency)
         }
     }
