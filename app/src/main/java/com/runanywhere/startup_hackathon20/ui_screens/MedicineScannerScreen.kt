@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +39,10 @@ import com.google.accompanist.permissions.shouldShowRationale
 import com.runanywhere.startup_hackathon20.ocr.TextRecognitionAnalyzer
 import com.runanywhere.startup_hackathon20.viewmodel.ScannerViewModel
 import com.runanywhere.startup_hackathon20.viewmodel.SharedMedicineViewModel
+import com.runanywhere.startup_hackathon20.viewmodel.MedicineViewModel
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.text.style.TextOverflow
 import java.util.concurrent.Executors
 
 /**
@@ -50,7 +56,8 @@ fun MedicineScannerScreen(
     onNavigateToChat: (String) -> Unit = {},
     onNavigateToInsights: (String) -> Unit = {},
     scannerViewModel: ScannerViewModel = viewModel(),
-    sharedViewModel: SharedMedicineViewModel = viewModel()
+    sharedViewModel: SharedMedicineViewModel = viewModel(),
+    medicineViewModel: MedicineViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -62,6 +69,11 @@ fun MedicineScannerScreen(
 
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var analyzer by remember { mutableStateOf<TextRecognitionAnalyzer?>(null) }
+    var prescriptionMode by remember { mutableStateOf(false) }
+    var prescriptionSaved by remember { mutableStateOf(false) }
+    val prescriptionMedicines = remember(detectedText, prescriptionMode) {
+        if (prescriptionMode) parsePrescriptionMedicines(detectedText) else emptyList()
+    }
 
     // Initialize camera provider
     LaunchedEffect(Unit) {
@@ -86,7 +98,7 @@ fun MedicineScannerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Scan Medicine Label") },
+                title = { Text(if (prescriptionMode) "Scan Prescription" else "Scan Medicine Label") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -103,6 +115,10 @@ fun MedicineScannerScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !prescriptionMode, onClick = { prescriptionMode = false; prescriptionSaved = false }, label = { Text("Medicine") }, leadingIcon = { Icon(Icons.Default.Medication, null) })
+                FilterChip(selected = prescriptionMode, onClick = { prescriptionMode = true; prescriptionSaved = false }, label = { Text("Prescription") }, leadingIcon = { Icon(Icons.Default.Description, null) })
+            }
             when {
                 cameraPermissionState.status.isGranted -> {
                     // Camera preview
@@ -135,7 +151,23 @@ fun MedicineScannerScreen(
                     }
 
                     // Results section
-                    ResultsSection(
+                    if (prescriptionMode) {
+                        PrescriptionResultsSection(
+                            detectedText = detectedText,
+                            medicines = prescriptionMedicines,
+                            isScanning = isScanning,
+                            error = error,
+                            saved = prescriptionSaved,
+                            onToggleScanning = { scannerViewModel.toggleScanning() },
+                            onSave = {
+                                prescriptionMedicines.forEach { medicine ->
+                                    medicineViewModel.insertMedicine(medicine.name, medicine.dosage, medicine.frequency, "", medicine.duration, medicine.quantity, medicine.instructions)
+                                }
+                                prescriptionSaved = prescriptionMedicines.isNotEmpty()
+                            },
+                            modifier = Modifier.fillMaxWidth().weight(1f)
+                        )
+                    } else ResultsSection(
                         detectedText = detectedText,
                         isScanning = isScanning,
                         error = error,
@@ -173,6 +205,88 @@ What is this medicine used for? (Brief answer)"""
                     )
                 }
             }
+        }
+    }
+}
+
+private data class PrescriptionMedicine(
+    val name: String,
+    val dosage: String = "",
+    val frequency: String = "",
+    val duration: String = "",
+    val quantity: String = "",
+    val instructions: String = ""
+)
+
+/** Split OCR text into medicine-like rows and attach nearby prescription instructions. */
+private fun parsePrescriptionMedicines(text: String): List<PrescriptionMedicine> {
+    val lines = text.lines().map { it.replace(Regex("\\s+"), " ").trim() }.filter { it.isNotBlank() }
+    val medicinePattern = Regex("(?i)([A-Za-z][A-Za-z0-9+.-]*(?:\\s+[A-Za-z][A-Za-z0-9+.-]*){0,3})\\s+((?:\\d+(?:\\.\\d+)?\\s*)(?:mg|mcg|g|ml|%)\\b.*)?")
+    val frequencyPattern = Regex("(?i)(once|twice|thrice|\\d+\\s*(?:times|x)\\s*(?:a|per)\\s*day|\\b(?:OD|BD|BID|TID|QID|HS|SOS)\\b)")
+    val durationPattern = Regex("(?i)(?:for\\s*)?(\\d+\\s*(?:days?|weeks?|months?))")
+    val result = mutableListOf<PrescriptionMedicine>()
+    lines.forEach { line ->
+        val match = medicinePattern.find(line)
+        val looksLikeMedicine = match != null && (Regex("\\d").containsMatchIn(line) || Regex("(?i)\\b(tab|tablet|cap|capsule|syrup|inj|cream|drops?)\\b").containsMatchIn(line))
+        if (looksLikeMedicine) {
+            val name = match!!.groupValues[1].trim().takeIf { it.length > 1 } ?: return@forEach
+            val dose = Regex("(?i)\\d+(?:\\.\\d+)?\\s*(?:mg|mcg|g|ml|%)").find(line)?.value.orEmpty()
+            val frequency = frequencyPattern.find(line)?.value.orEmpty()
+            val duration = durationPattern.find(line)?.groupValues?.get(1).orEmpty()
+            val quantity = Regex("(?i)(?:qty|quantity)\\s*[:.-]?\\s*(\\d+)").find(line)?.groupValues?.get(1).orEmpty()
+            val instructions = line.substringAfter(dose, "").trim(' ', '-', ',', ';')
+            result.add(PrescriptionMedicine(name, dose, frequency, duration, quantity, instructions))
+        } else if (result.isNotEmpty() && (frequencyPattern.containsMatchIn(line) || durationPattern.containsMatchIn(line) || Regex("(?i)\\b(after food|before food|with food|empty stomach|morning|night)\\b").containsMatchIn(line))) {
+            val previous = result.last()
+            result[result.lastIndex] = previous.copy(
+                frequency = previous.frequency.ifBlank { frequencyPattern.find(line)?.value.orEmpty() },
+                duration = previous.duration.ifBlank { durationPattern.find(line)?.groupValues?.get(1).orEmpty() },
+                instructions = listOf(previous.instructions, line).filter { it.isNotBlank() }.distinct().joinToString("; ")
+            )
+        }
+    }
+    return result.distinctBy { it.name.lowercase() }
+}
+
+@Composable
+private fun PrescriptionResultsSection(
+    detectedText: String,
+    medicines: List<PrescriptionMedicine>,
+    isScanning: Boolean,
+    error: String?,
+    saved: Boolean,
+    onToggleScanning: () -> Unit,
+    onSave: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text("Prescription medicines", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("Keep the full prescription in view. Review the recognized entries before saving.", style = MaterialTheme.typography.bodySmall)
+        if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+        if (medicines.isEmpty()) {
+            Text(if (detectedText.isBlank()) "Point the camera at a prescription." else "No medicine rows recognized yet. Try adjusting the camera or lighting.", modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Text("${medicines.size} medicine${if (medicines.size == 1) "" else "s"} found", modifier = Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelLarge)
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(medicines) { medicine ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(medicine.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(listOf(medicine.dosage, medicine.frequency, medicine.duration).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Details need review" }, style = MaterialTheme.typography.bodyMedium)
+                            if (medicine.instructions.isNotBlank()) Text(medicine.instructions, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+        Button(onClick = onToggleScanning, modifier = Modifier.fillMaxWidth()) {
+            Icon(if (isScanning) Icons.Default.Pause else Icons.Default.PlayArrow, null)
+            Spacer(Modifier.width(8.dp)); Text(if (isScanning) "Pause scanning" else "Resume scanning")
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = onSave, enabled = medicines.isNotEmpty() && !saved, modifier = Modifier.fillMaxWidth()) {
+            Icon(if (saved) Icons.Default.Check else Icons.Default.Add, null)
+            Spacer(Modifier.width(8.dp)); Text(if (saved) "Added to Insights" else "Add all to Insights")
         }
     }
 }
