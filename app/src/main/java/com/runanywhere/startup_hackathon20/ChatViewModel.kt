@@ -197,7 +197,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Fallback for SDK downloads that discard the underlying network error. */
     private suspend fun downloadModelDirectly(model: ModelInfo): String {
-        val url = model.downloadURL ?: error("No download URL registered for this model")
+        val registeredUrl = model.downloadURL ?: error("No download URL registered for this model")
+        // Migrate models already stored by older app versions as well.
+        val sourceUrl = registeredUrl.replace(
+            "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/",
+            "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/"
+        )
+        val url = if (sourceUrl.startsWith("https://huggingface.co/"))
+            sourceUrl + (if ('?' in sourceUrl) "&" else "?") + "download=true&request=" + System.currentTimeMillis()
+        else sourceUrl
         check(url.startsWith("https://")) { "Model URL must use HTTPS" }
         val directory = java.io.File(context.filesDir, "downloaded-models").apply { mkdirs() }
         val target = java.io.File(directory, model.id.replace(Regex("[^a-zA-Z0-9._-]"), "_") + ".gguf")
@@ -206,11 +214,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         connection.connectTimeout = 30000
         connection.readTimeout = 60000
         connection.instanceFollowRedirects = true
+        connection.useCaches = false
+        connection.setRequestProperty("Cache-Control", "no-cache")
+        connection.setRequestProperty("User-Agent", "MediInsight/Android")
         connection.setRequestProperty("Accept-Encoding", "identity")
         try {
             _statusMessage.value = "Connecting to model server..."
             val status = connection.responseCode
-            check(status == 200) { "Model server returned HTTP $status (${connection.responseMessage})" }
+            check(status == 200) {
+                "Model download rejected by ${connection.url.host}: HTTP $status (${connection.responseMessage})"
+            }
             val expected = connection.contentLengthLong
             if (expected > 0) check(directory.usableSpace > expected) { "Not enough storage for the model" }
             var received = 0L
