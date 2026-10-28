@@ -34,7 +34,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -298,7 +297,7 @@ private fun PrescriptionResultsSection(
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text("Prescription medicines", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text("Keep the full prescription in view. Text appears below as it is recognized. Pause the camera, then organize the captured text.", style = MaterialTheme.typography.bodySmall)
         if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
