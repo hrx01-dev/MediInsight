@@ -49,7 +49,7 @@ ${ocrText.take(6000)}""".trimIndent()
             (modelMedicines.ifEmpty { parseTabularFallback(ocrText) }).distinctBy { it.name.lowercase() }
         } catch (e: Exception) {
             Log.e("PrescriptionParser", "Could not structure prescription OCR", e)
-            emptyList()
+            parseTabularFallback(ocrText)
         }
     }
 
@@ -58,9 +58,27 @@ ${ocrText.take(6000)}""".trimIndent()
         val frequencyRegex = Regex("(?i)\\b(?:every\\s+\\d+\\s+hours?|once\\s+(?:a\\s+)?day|twice\\s+(?:a\\s+)?day|\\d+\\s+times?\\s+(?:a|per)\\s+day)\\b")
         val doseRegex = Regex("(?i)\\b(?:\\d+(?:\\.\\d+)?\\s*(?:mg|mcg|µg|g|ml|iu|units?)|\\d+\\s+(?:tablet|tablets|tab|tabs|capsule|capsules))\\b")
         val header = text.lines().indexOfFirst { line ->
-            line.contains("medication name", true) && line.contains("dosage", true) && line.contains("frequency", true)
+            line.contains("medication name", true) || line.contains("medicine name", true) ||
+                (line.contains("purpose", true) && line.contains("dosage", true) && line.contains("frequency", true))
         }
-        if (header < 0) return emptyList()
+        if (header < 0) {
+            // ML Kit often emits table cells as separate lines rather than preserving columns.
+            val cellLines = text.lines().map { it.replace(Regex("\\s+"), " ").trim().trim('|', '│', '¦', '•', '-', ' ') }
+                .filter { it.isNotBlank() }
+            val frequencyIndexes = cellLines.indices.filter { frequencyRegex.containsMatchIn(cellLines[it]) }
+            return frequencyIndexes.mapNotNull { frequencyIndex ->
+                if (frequencyIndex < 2) return@mapNotNull null
+                val doseIndex = (frequencyIndex - 1 downTo maxOf(0, frequencyIndex - 3))
+                    .firstOrNull { doseRegex.containsMatchIn(cellLines[it]) } ?: return@mapNotNull null
+                val nameIndex = doseIndex - 2
+                if (nameIndex < 0) return@mapNotNull null
+                val name = cellLines[nameIndex]
+                if (name.length < 2 || name.split(Regex("\\s+")).size > 4 || nonMedicineHeadings.containsMatchIn(name)) return@mapNotNull null
+                val purpose = cellLines.getOrNull(nameIndex + 1).orEmpty()
+                if (ignored.containsMatchIn(purpose) || purpose.split(Regex("\\s+")).size >= 2) return@mapNotNull null
+                Medicine(name = name, dosage = doseRegex.find(cellLines[doseIndex])?.value.orEmpty(), frequency = frequencyRegex.find(cellLines[frequencyIndex])?.value.orEmpty())
+            }.distinctBy { it.name.lowercase() }
+        }
         val ignored = Regex("(?i)\\b(?:oral|intravenous|topical|purpose|infection|immune system|fever|phlegm)\\b")
         return text.lines().drop(header + 1).mapNotNull { raw ->
             val line = raw.replace(Regex("\\s+"), " ").trim().trim('|', '│', '¦', '•', '-', ' ')
