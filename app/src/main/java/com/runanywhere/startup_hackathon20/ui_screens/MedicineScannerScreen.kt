@@ -106,19 +106,8 @@ fun MedicineScannerScreen(
                         return@launch
                     }
                     prescriptionMedicines = parsed
-                    var savedCount = 0
-                    for (medicine in parsed) {
-                        val saved = medicineViewModel.insertMedicineAndAwait(
-                            name = medicine.name,
-                            dosage = medicine.dosage,
-                            frequency = medicine.frequency,
-                            time = medicine.time,
-                            duration = medicine.duration,
-                            quantity = medicine.quantity,
-                            instructions = medicine.instructions
-                        )
-                        if (saved.isSuccess) savedCount++ else throw saved.exceptionOrNull() ?: IllegalStateException("Could not save ${medicine.name}")
-                    }
+                    val saveResult = medicineViewModel.insertMedicinesAndAwait(parsed)
+                    val savedCount = saveResult.getOrElse { throw it }
                     prescriptionSaved = savedCount == parsed.size
                     if (prescriptionSaved) prescriptionError = "Added $savedCount medicine${if (savedCount == 1) "" else "s"} to Insights."
                 } catch (e: Exception) {
