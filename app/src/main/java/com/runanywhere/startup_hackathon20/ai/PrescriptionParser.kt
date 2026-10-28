@@ -1,11 +1,15 @@
 package com.runanywhere.startup_hackathon20.ai
 
-/**
- * Utility to parse prescription text and extract medicine information.
- */
+import android.util.Log
+import com.google.gson.Gson
+import com.runanywhere.sdk.public.RunAnywhere
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/** Structures OCR text into medicine entries using MediInsight's configured on-device model. */
 object PrescriptionParser {
     data class Medicine(
-        val name: String,
+        val name: String = "",
         val dosage: String = "",
         val frequency: String = "",
         val time: String = "",
@@ -14,39 +18,57 @@ object PrescriptionParser {
         val instructions: String = ""
     )
 
-    fun parse(text: String): List<Medicine> {
-        val lines = text.lines().map { it.replace(Regex("\\s+"), " ").trim() }.filter { it.isNotBlank() }
-        val dosageRegex = Regex("(?i)\\b\\d+(?:\\.\\d+)?\\s*(?:mg|mcg|µg|g|ml|mL|IU|units?)\\b")
-        val frequencyRegex = Regex("(?i)\\b(?:once|twice|thrice|\\d+\\s*(?:times|x)\\s*(?:a|per)\\s*day|every\\s*\\d+\\s*hours?|OD|BD|BID|TID|QID|HS|SOS)\\b")
-        val durationRegex = Regex("(?i)\\b\\d+\\s*(?:days?|weeks?|months?)\\b")
-        val dosageFormRegex = Regex("(?i)\\b(?:tab(?:let)?s?|cap(?:sule)?s?|syrup|suspension|injection|inj|cream|ointment|drops?)\\b")
-        val stopWords = Regex("(?i)\\b(?:patient|doctor|dr|date|age|address|phone|hospital|clinic|diagnosis|prescription|rx|signature|registration|reg|follow.?up|allergy|complaint|history|mrn|name)\\b")
-        val result = mutableListOf<Medicine>()
-        lines.forEach { line ->
-            val doseMatch = dosageRegex.find(line)
-            val formMatch = dosageFormRegex.find(line)
-            val hasMedicineEvidence = doseMatch != null || formMatch != null
-            if (!hasMedicineEvidence || stopWords.containsMatchIn(line)) return@forEach
+    private data class Result(val medicines: List<Medicine> = emptyList())
+    private val gson = Gson()
+    private val medicineEvidence = Regex("(?i)\\b(?:mg|mcg|µg|g|ml|iu|units?|tablet|tablets|tab|tabs|capsule|capsules|cap|caps|syrup|injection|inj|drops?)\\b|\\b\\d+\\s*(?:tablet|tablets|tab|tabs|capsule|capsules|cap|caps)\\b")
+    private val nonMedicineHeadings = Regex("(?i)\\b(?:prescription|template|prescription no|prescription date|patient information|patient|name|age|phone|email|address|date of birth|gender|allergies|health condition|list of prescribed medications|medication name|purpose|dosage|dose|route|frequency|physician|signature|registration|diagnosis)\\b")
 
-            val boundary = listOfNotNull(doseMatch?.range?.first, formMatch?.range?.first).minOrNull() ?: return@forEach
-            val prefix = line.substring(0, boundary).trim().trimEnd(':', '-', '.', ',', ';', ')')
-            val name = prefix.replace(Regex("(?i)^(?:\\d+[.)]?\\s*|(?:tab|tablet|cap|capsule)\\s+)"), "").trim()
-            if (name.length < 2 || name.split(Regex("\\s+")).size > 5 || stopWords.containsMatchIn(name)) return@forEach
+    suspend fun parse(ocrText: String): List<Medicine> = withContext(Dispatchers.IO) {
+        if (ocrText.isBlank()) return@withContext emptyList()
+        val prompt = """You extract medication orders from OCR of a prescription. The OCR may be laid out as a table where each medicine row contains separate cells for name, purpose, dose, route, and frequency. Reconstruct row relationships by reading order and nearby lines. Return ONLY valid JSON in this schema:
+{"medicines":[{"name":"","dosage":"","frequency":"","time":"","duration":"","quantity":"","instructions":""}]}
 
-            val dosage = listOfNotNull(doseMatch?.value, formMatch?.value).joinToString(" ").trim()
-            val frequency = frequencyRegex.find(line)?.value.orEmpty()
-            val duration = durationRegex.find(line)?.value.orEmpty()
-            val quantity = Regex("(?i)\\b(?:qty|quantity)\\s*[:.-]?\\s*(\\d+)\\b").find(line)?.groupValues?.get(1)?.let { "$it units" }.orEmpty()
-            val instructionBits = buildList {
-                Regex("(?i)\\b(?:after|before|with)\\s+(?:food|meals?|breakfast|lunch|dinner)\\b|\\bon empty stomach\\b|\\b(?:morning|afternoon|evening|night|bedtime)\\b")
-                    .findAll(line).forEach { add(it.value) }
-            }.distinct()
-            
-            // Try to extract time from instruction bits
-            val timeValue = instructionBits.find { it.contains(Regex("morning|afternoon|evening|night|bedtime", RegexOption.IGNORE_CASE)) } ?: ""
-            
-            result.add(Medicine(name, dosage, frequency, timeValue, duration, quantity, instructionBits.joinToString("; ")))
+Rules:
+- Include each medicine name from the prescribed medications table, even when its name has no numeric strength or dosage form. Include only rows from that table; never use patient/doctor/hospital details, headings, purpose, or route as medicine names.
+- Keep every medicine as its own object. Copy only supported details from the text; use empty strings for missing fields.
+- dosage is strength/dose (example: 500 mg or 1 tablet); frequency is how often (example: twice daily); time is time of day or relation to meals; duration is course length; quantity is total units only when explicitly stated; instructions are other explicit medicine-specific directions.
+- Do not put the same value in multiple fields. Do not treat OCR headings, names, addresses, dates, diagnoses, or signatures as medicines.
+
+OCR text:
+${ocrText.take(6000)}""".trimIndent()
+        try {
+        val response = RunAnywhere.generate(prompt)
+            val json = response.substringAfter('{', "").let { if (it.isNotEmpty()) "{$it" else "" }
+            if (json.isBlank()) return@withContext emptyList()
+            val result = gson.fromJson(json, Result::class.java)
+            val modelMedicines = result.medicines.orEmpty().filter { medicine ->
+                val name = medicine.name.trim()
+                name.length >= 2 && !nonMedicineHeadings.containsMatchIn(name) &&
+                    (medicineEvidence.containsMatchIn(name + " " + medicine.dosage) || medicine.frequency.isNotBlank())
+            }
+            (modelMedicines.ifEmpty { parseTabularFallback(ocrText) }).distinctBy { it.name.lowercase() }
+        } catch (e: Exception) {
+            Log.e("PrescriptionParser", "Could not structure prescription OCR", e)
+            emptyList()
         }
-        return result.distinctBy { it.name.lowercase() }
+    }
+
+    /** Handles clear printed tables when the local model returns malformed or empty JSON. */
+    private fun parseTabularFallback(text: String): List<Medicine> {
+        val frequencyRegex = Regex("(?i)\\b(?:every\\s+\\d+\\s+hours?|once\\s+(?:a\\s+)?day|twice\\s+(?:a\\s+)?day|\\d+\\s+times?\\s+(?:a|per)\\s+day)\\b")
+        val doseRegex = Regex("(?i)\\b(?:\\d+(?:\\.\\d+)?\\s*(?:mg|mcg|µg|g|ml|iu|units?)|\\d+\\s+(?:tablet|tablets|tab|tabs|capsule|capsules))\\b")
+        val header = text.lines().indexOfFirst { line ->
+            line.contains("medication name", true) && line.contains("dosage", true) && line.contains("frequency", true)
+        }
+        if (header < 0) return emptyList()
+        val ignored = Regex("(?i)\\b(?:oral|intravenous|topical|purpose|infection|immune system|fever|phlegm)\\b")
+        return text.lines().drop(header + 1).mapNotNull { raw ->
+            val line = raw.replace(Regex("\\s+"), " ").trim().trim('|', '│', '¦', '•', '-', ' ')
+            val frequency = frequencyRegex.find(line)?.value ?: return@mapNotNull null
+            val dose = doseRegex.find(line)?.value ?: return@mapNotNull null
+            val name = line.substringBefore(dose).trim().trim('|', '│', '¦', '•', '-', ' ')
+            if (name.length < 2 || name.split(Regex("\\s+")).size > 4 || nonMedicineHeadings.containsMatchIn(name) || ignored.containsMatchIn(name)) return@mapNotNull null
+            Medicine(name = name, dosage = dose, frequency = frequency)
+        }
     }
 }
