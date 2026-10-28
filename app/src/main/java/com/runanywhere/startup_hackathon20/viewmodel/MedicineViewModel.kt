@@ -35,6 +35,38 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
 
     private val _currentUserId = MutableStateFlow<Long?>(null)
 
+    suspend fun insertMedicineAndAwait(
+        name: String,
+        dosage: String = "",
+        frequency: String = "",
+        time: String = "",
+        duration: String = "",
+        quantity: String = "",
+        instructions: String = ""
+    ): Result<Long> {
+        val userId = _currentUserId.value ?: return Result.failure(IllegalStateException("No user logged in"))
+        return try {
+            val entity = MedicineEntity(
+                userId = userId,
+                name = name,
+                dosage = dosage,
+                frequency = frequency,
+                time = time,
+                duration = duration,
+                quantity = quantity,
+                instructions = instructions
+            )
+            val medicineId = repository.insertMedicine(entity)
+            if (time.isNotBlank() && frequency.isNotBlank()) {
+                ReminderScheduler.scheduleMedicineReminder(getApplication(), medicineId, name, dosage, instructions, time, frequency)
+            }
+            Result.success(medicineId)
+        } catch (e: Exception) {
+            Log.e("MedicineViewModel", "Error inserting medicine: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
     init {
         val database = MedicineDatabase.getDatabase(application)
         val medicineDao = database.medicineDao()
