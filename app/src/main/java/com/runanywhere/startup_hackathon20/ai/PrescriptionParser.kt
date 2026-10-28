@@ -42,9 +42,9 @@ ${ocrText.take(6000)}""".trimIndent()
         try {
         val response = RunAnywhere.generate(prompt)
             val json = response.substringAfter('{', "").let { if (it.isNotEmpty()) "{$it" else "" }
-            if (json.isBlank()) return@withContext emptyList()
-            val result = gson.fromJson(json, Result::class.java)
-            val modelMedicines = result.medicines.orEmpty().filter { medicine ->
+            if (json.isBlank()) return@withContext parseTabularFallback(ocrText)
+            val result = runCatching { gson.fromJson(json, Result::class.java) }.getOrNull()
+            val modelMedicines = result?.medicines.orEmpty().filter { medicine ->
                 val name = medicine.name.trim()
                 name.length >= 2 && !nonMedicineHeadings.containsMatchIn(name) &&
                     (medicineEvidence.containsMatchIn(name + " " + medicine.dosage) || medicine.frequency.isNotBlank())
