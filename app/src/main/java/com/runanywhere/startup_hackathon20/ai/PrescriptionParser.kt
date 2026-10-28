@@ -24,13 +24,7 @@ object PrescriptionParser {
     private val nonMedicineHeadings = Regex("(?i)\\b(?:prescription|template|prescription no|prescription date|patient information|patient|name|age|phone|email|address|date of birth|gender|allergies|health condition|list of prescribed medications|medication name|purpose|dosage|dose|route|frequency|physician|signature|registration|diagnosis)\\b")
     private val ignoredTerms = Regex("(?i)\\b(?:oral|intravenous|topical|purpose|infection|immune system|fever|phlegm)\\b")
 
-    suspend fun parse(ocrText: String, forceAi: Boolean = false): List<Medicine> = withContext(Dispatchers.IO) {
-        if (ocrText.isBlank()) return@withContext emptyList()
-        if (!forceAi) {
-            val tableMedicines = parseTabularFallback(ocrText)
-            if (tableMedicines.isNotEmpty()) return@withContext tableMedicines
-        }
-        val prompt = """You are converting OCR text from a medicine prescription into structured medicine insights for the user to review. OCR may have merged table columns, split a row across lines, or introduced spelling/spacing noise. Carefully reconstruct the table row relationships from headers, reading order, and nearby values. Correct obvious OCR spacing/character errors in medicine names and field values only when the intended value is clear from the text. Never guess a missing value.
+    fun buildPrompt(ocrText: String): String = """You are converting OCR text from a medicine prescription into structured medicine insights for the user to review. OCR may have merged table columns, split a row across lines, or introduced spelling/spacing noise. Carefully reconstruct the table row relationships from headers, reading order, and nearby values. Correct obvious OCR spacing/character errors in medicine names and field values only when the intended value is clear from the text. Never guess a missing value.
 
 Return ONLY valid JSON in exactly this schema, with one object for every prescribed medicine:
 {"medicines":[{"name":"","dosage":"","frequency":"","time":"","duration":"","quantity":"","instructions":""}]}
@@ -46,6 +40,14 @@ Rules:
 
 OCR text:
 ${ocrText}""".trimIndent()
+
+    suspend fun parse(ocrText: String, forceAi: Boolean = false): List<Medicine> = withContext(Dispatchers.IO) {
+        if (ocrText.isBlank()) return@withContext emptyList()
+        if (!forceAi) {
+            val tableMedicines = parseTabularFallback(ocrText)
+            if (tableMedicines.isNotEmpty()) return@withContext tableMedicines
+        }
+        val prompt = buildPrompt(ocrText)
         try {
         val response = RunAnywhere.generate(prompt)
             val json = response.substringAfter('{', "").let { if (it.isNotEmpty()) "{$it" else "" }
