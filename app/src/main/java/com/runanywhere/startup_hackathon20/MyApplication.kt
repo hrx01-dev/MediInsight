@@ -11,6 +11,9 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
 class MyApplication : Application() {
+    private val sdkReady = kotlinx.coroutines.CompletableDeferred<Unit>()
+    suspend fun awaitSdkReady() = sdkReady.await()
+
 
     override fun onCreate() {
         super.onCreate()
@@ -49,9 +52,11 @@ class MyApplication : Application() {
             RunAnywhere.scanForDownloadedModels()
             Log.i("MyApp", "Model scan completed")
 
+            sdkReady.complete(Unit)
             Log.i("MyApp", "SDK initialized successfully")
 
         } catch (e: Exception) {
+            sdkReady.completeExceptionally(e)
             Log.e("MyApp", "SDK initialization failed: ${e.message}", e)
         }
     }
@@ -84,6 +89,7 @@ class MyApplication : Application() {
             
         } catch (e: Exception) {
             Log.e("MyApp", "Model registration failed: ${e.message}", e)
+            throw e
         }
     }
 }
