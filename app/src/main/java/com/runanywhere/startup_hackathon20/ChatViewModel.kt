@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 
 // Simple Message Data Class
 data class ChatMessage(
@@ -318,6 +320,32 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 loadingModel = false
             }
+        }
+    }
+
+    suspend fun sendPrescriptionMessage(ocrText: String): List<com.runanywhere.startup_hackathon20.ai.PrescriptionParser.Medicine> {
+        check(_isModelVerified.value) { "Model is not ready yet" }
+        check(!_isLoading.value) { "Wait for the current response to finish" }
+        _isLoading.value = true
+        try {
+            val userId = kotlinx.coroutines.withTimeout(10000) { _currentUserId.filterNotNull().first() }
+            val prompt = com.runanywhere.startup_hackathon20.ai.PrescriptionParser.buildPrompt(ocrText)
+            val timestamp = System.currentTimeMillis()
+            repository.insertMessage(ChatMessageEntity(userId = userId, text = prompt, isUser = true, timestamp = timestamp), userId)
+            val medicines = com.runanywhere.startup_hackathon20.ai.PrescriptionParser.parse(ocrText, forceAi = true)
+            val response = if (medicines.isEmpty()) "No medicines could be structured. Please check the OCR text."
+                else medicines.joinToString("\n\n") { medicine ->
+                    listOf("Medicine: ${medicine.name}", "Dosage: ${medicine.dosage.ifBlank { "Not specified" }}",
+                        "Frequency: ${medicine.frequency.ifBlank { "Not specified" }}",
+                        "Time: ${medicine.time.ifBlank { "Not specified" }}",
+                        "Duration: ${medicine.duration.ifBlank { "Not specified" }}",
+                        "Quantity: ${medicine.quantity.ifBlank { "Not specified" }}",
+                        "Instructions: ${medicine.instructions.ifBlank { "Not specified" }}").joinToString("\n")
+                }
+            repository.insertMessage(ChatMessageEntity(userId = userId, text = response, isUser = false, timestamp = timestamp + 1), userId)
+            return medicines
+        } finally {
+            _isLoading.value = false
         }
     }
 
