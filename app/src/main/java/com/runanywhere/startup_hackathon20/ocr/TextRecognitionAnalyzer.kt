@@ -36,7 +36,14 @@ class TextRecognitionAnalyzer(
                     val detectedText = visionText.text
                     if (detectedText.isNotBlank()) {
                         Log.d("TextRecognition", "Detected: $detectedText")
-                        onTextDetected(detectedText)
+                        // Preserve ML Kit's visual row order. This makes prescription
+                        // tables understandable to the downstream parser.
+                        val structuredText = visionText.textBlocks
+                            .flatMap { block -> block.lines }
+                            .sortedWith(compareBy({ it.boundingBox?.centerY() ?: Int.MAX_VALUE }, { it.boundingBox?.left ?: 0 }))
+                            .joinToString("\n") { it.text }
+                            .ifBlank { detectedText }
+                        onTextDetected(structuredText)
                     }
                 }
                 .addOnFailureListener { exception ->
