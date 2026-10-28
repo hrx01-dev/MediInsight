@@ -22,6 +22,7 @@ import com.runanywhere.startup_hackathon20.ui_screens.HomeScreen
 import com.runanywhere.startup_hackathon20.ui_screens.InsightsScreen
 
 import com.runanywhere.startup_hackathon20.ui_screens.MedicineScannerScreen
+import com.runanywhere.startup_hackathon20.ui_screens.ScanChoiceScreen
 import com.runanywhere.startup_hackathon20.ui_screens.NotificationsScreen
 import com.runanywhere.startup_hackathon20.ui_screens.OnboardingScreens
 import com.runanywhere.startup_hackathon20.ui_screens.SettingsScreen
@@ -98,7 +99,7 @@ fun AppNavGraph(
                     when (route) {
                         "insights" -> navController.navigate(Routes.MedicalInsights)
                         "addMedicine" -> navController.navigate(Routes.AddMedicines)
-                        "scanner" -> navController.navigate(Routes.MedicineScanner)
+                        "scanner" -> navController.navigate(Routes.ScanChoice)
 
                         "settings" -> navController.navigate(Routes.Settings)
                         "notifications" -> navController.navigate(Routes.Notification)
@@ -236,14 +237,25 @@ fun AppNavGraph(
         }
 
         // Medicine Scanner Screen - Bounce in
+        composable(route = Routes.ScanChoice) {
+            ScanChoiceScreen(
+                onBack = { navController.popBackStack() },
+                onSelectMedicine = { navController.navigate("${Routes.MedicineScanner}?mode=medicine") },
+                onSelectPrescription = { navController.navigate("${Routes.MedicineScanner}?mode=prescription") }
+            )
+        }
+
         composable(
-            route = Routes.MedicineScanner,
+            route = "${Routes.MedicineScanner}?mode={mode}",
+            arguments = listOf(navArgument("mode") { type = NavType.StringType; defaultValue = "medicine" }),
             enterTransition = { ScreenTransitions.bounceInTransition(duration = 600).targetContentEnter },
             exitTransition = { ScreenTransitions.bounceInTransition(duration = 400).initialContentExit },
             popEnterTransition = { ScreenTransitions.bounceInTransition(duration = 500).targetContentEnter },
             popExitTransition = { ScreenTransitions.bounceInTransition(duration = 400).initialContentExit }
-        ) {
+        ) { backStackEntry ->
+            val prescriptionMode = backStackEntry.arguments?.getString("mode") == "prescription"
             MedicineScannerScreen(
+                initialPrescriptionMode = prescriptionMode,
                 onBack = {
                     navController.popBackStack()
                 },
