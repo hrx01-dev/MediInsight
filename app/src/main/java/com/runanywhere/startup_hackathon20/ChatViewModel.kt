@@ -113,9 +113,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadAvailableModels() {
         viewModelScope.launch {
             try {
+                (getApplication<Application>() as MyApplication).awaitSdkReady()
                 val models = listAvailableModels()
                 _availableModels.value = models
-                _statusMessage.value = "Ready - Please download and load a model"
+                if (!downloadingModel && !loadingModel && !_isModelVerified.value) {
+                    _statusMessage.value = "Ready - Please download and load a model"
+                }
             } catch (e: Exception) {
                 _statusMessage.value = "Error loading models: ${e.message}"
             }
@@ -135,12 +138,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun downloadModel(modelId: String) {
         if (downloadingModel || loadingModel) return
         downloadingModel = true
+        _downloadProgress.value = 0f
         viewModelScope.launch {
             try {
                 _statusMessage.value = "Downloading model..."
-                RunAnywhere.downloadModel(modelId).collect { progress ->
-                    _downloadProgress.value = progress
-                    _statusMessage.value = "Downloading: ${(progress * 100).toInt()}%"
+                (getApplication<Application>() as MyApplication).awaitSdkReady()
+                kotlinx.coroutines.withTimeout(30 * 60 * 1000L) {
+                    RunAnywhere.downloadModel(modelId).collect { progress ->
+                        _downloadProgress.value = progress
+                        _statusMessage.value = "Downloading: ${(progress * 100).toInt()}%"
+                    }
                 }
                 _downloadProgress.value = null
                 _statusMessage.value = "Download complete! Loading model..."
@@ -151,7 +158,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 // Refresh the available models list to update download status
                 loadAvailableModels()
             } catch (e: Exception) {
-                _statusMessage.value = "Download failed: ${e.message}"
+                Log.e("ChatViewModel", "Model download failed: $modelId", e)
+                _statusMessage.value = "Download failed: ${e.message ?: e.javaClass.simpleName}. Tap Download to retry."
                 _downloadProgress.value = null
             } finally {
                 downloadingModel = false
